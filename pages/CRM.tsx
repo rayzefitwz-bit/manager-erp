@@ -655,7 +655,7 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
           {isAdmin && <p className="text-xs text-gray-400 font-medium">Administrador: Controle total de atribuição e fluxo.</p>}
         </div>
         <div className="flex gap-2">
-          {isAdmin && lastSyncConfig && (
+          {lastSyncConfig && (
             <button
               onClick={handleSync} disabled={isSyncing}
               className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm transition-all text-sm font-bold"
