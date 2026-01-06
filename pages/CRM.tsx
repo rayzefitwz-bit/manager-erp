@@ -508,7 +508,9 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                     createdAt: row[3] ? String(row[3]).trim() : undefined,
                     role: 'Sincronizado'
                 };
-            }).filter(item => item && item.name && item.phone);
+            }).filter((item): item is { name: string; classLocation: string; phone: string; createdAt?: string; role: string } => 
+                item !== null && item.name !== '' && item.phone !== ''
+            );
         importLeads(parsed, 0, { type: 'SINGLE', sellerId: lastSyncConfig.sellerId }, lastSyncConfig.url);
     } catch (error) { alert("Erro na sincronização."); } finally { setIsSyncing(false); }
   };
