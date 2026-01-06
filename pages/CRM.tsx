@@ -827,3 +827,5 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
   );
 };
 
+
+// End of component
