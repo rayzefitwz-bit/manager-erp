@@ -826,4 +826,4 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
     </div>
   );
 };
-```
+
