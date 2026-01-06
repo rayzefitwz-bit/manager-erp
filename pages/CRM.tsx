@@ -445,6 +445,11 @@ export const CRM = () => {
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<LeadStatus | 'ALL'>('ALL');
+  const [filterSeller, setFilterSeller] = useState<string>('ALL');
+  const [filterDate, setFilterDate] = useState('');
+
   const [showNewLeadForm, setShowNewLeadForm] = useState(false);
   const [newLeadName, setNewLeadName] = useState('');
   const [newLeadPhone, setNewLeadPhone] = useState('');
