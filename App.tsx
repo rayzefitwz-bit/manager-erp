@@ -13,13 +13,15 @@ import { Team } from './pages/Team';
 import { KnowledgeBase } from './pages/KnowledgeBase';
 import { SalesAnalysis } from './pages/SalesAnalysis';
 import { LostLeads } from './pages/LostLeads';
+import { LeadHistory } from './pages/LeadHistory';
+import { Suppliers } from './pages/Suppliers';
 import { Login } from './pages/Login';
 
 const ProtectedRoutes = () => {
   const { isAuthenticated, user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || user?.role === 'PROFESSOR') {
     return <Navigate to="/login" replace />;
   }
 
@@ -27,7 +29,7 @@ const ProtectedRoutes = () => {
     <Layout>
       <Routes>
         {/* Vendedores são redirecionados para o CRM se tentarem acessar a raiz */}
-        <Route path="/" element={isAdmin ? <Dashboard /> : <Navigate to="/crm" replace />} />
+        <Route path="/" element={(isAdmin || user?.role === 'VENDEDOR') ? <Dashboard /> : <Navigate to="/crm" replace />} />
 
         <Route path="/crm" element={<CRM />} />
 
@@ -36,6 +38,8 @@ const ProtectedRoutes = () => {
         <Route path="/financeiro" element={isAdmin ? <Finance /> : <Navigate to="/crm" replace />} />
         <Route path="/equipe" element={isAdmin ? <Team /> : <Navigate to="/crm" replace />} />
         <Route path="/leads-perdidos" element={isAdmin ? <LostLeads /> : <Navigate to="/crm" replace />} />
+        <Route path="/historico" element={isAdmin ? <LeadHistory /> : <Navigate to="/crm" replace />} />
+        <Route path="/fornecedores" element={isAdmin ? <Suppliers /> : <Navigate to="/crm" replace />} />
 
         {/* Rotas abertas para Vendedor e Admin */}
         <Route path="/conhecimento" element={<KnowledgeBase />} />

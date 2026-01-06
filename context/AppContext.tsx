@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Lead, Transaction, TeamMember, LeadStatus, SaleRecord, Modality, KnowledgeItem, ImmersiveClass } from '../types';
+import { Lead, Transaction, TeamMember, LeadStatus, SaleRecord, Modality, KnowledgeItem, ImmersiveClass, LeadHistoryEntry, CommissionPaymentRecord, Supplier } from '../types';
 import { MOCK_TEAM } from '../constants';
 import { supabase } from '../supabase';
 
@@ -16,15 +16,23 @@ interface AppContextType {
   team: TeamMember[];
   knowledgeItems: KnowledgeItem[];
   immersiveClasses: ImmersiveClass[];
+  leadHistory: LeadHistoryEntry[];
+  commissionPayments: CommissionPaymentRecord[];
+  suppliers: Supplier[];
+  suppliersSyncUrl: string | null;
   lastSyncConfig: SyncConfig | null;
   isLoading: boolean;
-  addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'status'>) => void;
-  updateLeadStatus: (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string }) => void;
+  addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'status' | 'updatedAt'>) => void;
+  updateLeadStatus: (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string }, observation?: string, changedBy?: { id: string; name: string }) => void;
   reassignLeads: (leadIds: string[], sellerId: string) => void;
   importLeads: (leadsData: Array<{ name: string; phone: string; role?: string; classLocation?: string; createdAt?: string }>, totalImportCost: number, assignmentConfig?: { type: 'SINGLE' | 'EQUAL', sellerId?: string }, sheetsUrl?: string, investmentClassLocation?: string) => void;
   deleteLeads: (leadIds: string[]) => void;
   clearLeads: () => void;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
+  payCommission: (memberId: string, amount: number, type: 'SELLER' | 'TEACHER', memberName: string) => Promise<void>;
+  addSupplier: (supplier: Omit<Supplier, 'id' | 'updatedAt'>) => void;
+  removeSupplier: (id: string) => void;
+  syncSuppliers: (url: string) => Promise<void>;
   addTeamMember: (member: Omit<TeamMember, 'id'>) => void;
   removeTeamMember: (id: string) => void;
   getSalesBySeller: (sellerId: string) => Lead[];
@@ -49,9 +57,13 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [team, setTeam] = useState<TeamMember[]>(MOCK_TEAM);
+  const [team, setTeam] = useState<TeamMember[]>(MOCK_TEAM as TeamMember[]);
   const [immersiveClasses, setImmersiveClasses] = useState<ImmersiveClass[]>(DEFAULT_CLASSES);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
+  const [leadHistory, setLeadHistory] = useState<LeadHistoryEntry[]>([]);
+  const [commissionPayments, setCommissionPayments] = useState<CommissionPaymentRecord[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [suppliersSyncUrl, setSuppliersSyncUrl] = useState<string | null>(null);
   const [lastSyncConfig, setLastSyncConfig] = useState<SyncConfig | null>(null);
 
   // Initial Data Load
@@ -64,6 +76,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         const { data: dbTeam } = await supabase.from('team').select('*');
         const { data: dbClasses } = await supabase.from('immersive_classes').select('*');
         const { data: dbKnowledge } = await supabase.from('knowledge_items').select('*');
+        const { data: dbHistory } = await supabase.from('lead_history').select('*');
 
         if (dbLeads) setLeads(dbLeads);
         else {
@@ -95,6 +108,29 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
           if (saved) setKnowledgeItems(JSON.parse(saved));
         }
 
+        if (dbHistory) setLeadHistory(dbHistory);
+        else {
+          const saved = localStorage.getItem('leadHistory');
+          if (saved) setLeadHistory(JSON.parse(saved));
+        }
+
+        const { data: dbCommPayments } = await supabase.from('commission_payments').select('*');
+        if (dbCommPayments) setCommissionPayments(dbCommPayments);
+        else {
+          const saved = localStorage.getItem('commissionPayments');
+          if (saved) setCommissionPayments(JSON.parse(saved));
+        }
+
+        const { data: dbSuppliers } = await supabase.from('suppliers').select('*');
+        if (dbSuppliers) setSuppliers(dbSuppliers);
+        else {
+          const saved = localStorage.getItem('suppliers');
+          if (saved) setSuppliers(JSON.parse(saved));
+        }
+
+        const savedSuppliersUrl = localStorage.getItem('suppliersSyncUrl');
+        if (savedSuppliersUrl) setSuppliersSyncUrl(savedSuppliersUrl);
+
         const savedSync = localStorage.getItem('lastSyncConfig');
         if (savedSync) setLastSyncConfig(JSON.parse(savedSync));
 
@@ -110,18 +146,82 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     initData();
   }, []);
 
+  // --- Sistema de Realocação Automática (72h) ---
+  useEffect(() => {
+    const checkLeadsForReallocation = async () => {
+      const now = new Date();
+      const reallocationThreshold = 72 * 60 * 60 * 1000; // 72 Horas em ms
+
+      const sellers = team.filter(m => m.role === 'VENDEDOR');
+      if (sellers.length < 2) return; // Precisa de pelo menos 2 vendedores para rodar a fila
+
+      const leadsToReassign = leads.filter(lead => {
+        if (lead.status === 'GANHO' || !lead.assignedToId) return false;
+
+        const lastUpdate = new Date(lead.updatedAt || lead.createdAt);
+        const diff = now.getTime() - lastUpdate.getTime();
+
+        return diff > reallocationThreshold;
+      });
+
+      if (leadsToReassign.length === 0) return;
+
+      console.log(`Sistema: Realocando ${leadsToReassign.length} leads por inatividade.`);
+
+      const updatedLeads = leads.map(lead => {
+        const toReassign = leadsToReassign.find(l => l.id === lead.id);
+        if (toReassign) {
+          // Lógica de Rotação Simples: Encontrar o próximo vendedor na lista
+          const currentIndex = sellers.findIndex(s => s.id === lead.assignedToId);
+          const nextSeller = sellers[(currentIndex + 1) % sellers.length];
+
+          return {
+            ...lead,
+            assignedToId: nextSeller.id,
+            updatedAt: now.toISOString(),
+            observation: (lead.observation || '') + `\n[Sistema] Realocado automaticamente por inatividade (>72h). Antigo: ${sellers[currentIndex]?.name}`
+          };
+        }
+        return lead;
+      });
+
+      setLeads(updatedLeads);
+
+      // Update DB batch (idealmente um hook de sincronização)
+      for (const lead of leadsToReassign) {
+        const currentIndex = sellers.findIndex(s => s.id === lead.assignedToId);
+        const nextSeller = sellers[(currentIndex + 1) % sellers.length];
+
+        await supabase.from('leads').update({
+          assignedToId: nextSeller.id,
+          updatedAt: now.toISOString(),
+          observation: (lead.observation || '') + `\n[Sistema] Realocado automaticamente por inatividade (>72h).`
+        }).eq('id', lead.id);
+      }
+    };
+
+    // Rodar a cada 1 hora
+    const interval = setInterval(checkLeadsForReallocation, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [leads, team]);
+
   useEffect(() => { localStorage.setItem('leads', JSON.stringify(leads)); }, [leads]);
   useEffect(() => { localStorage.setItem('transactions', JSON.stringify(transactions)); }, [transactions]);
   useEffect(() => { localStorage.setItem('team', JSON.stringify(team)); }, [team]);
   useEffect(() => { localStorage.setItem('immersiveClasses', JSON.stringify(immersiveClasses)); }, [immersiveClasses]);
   useEffect(() => { localStorage.setItem('knowledgeItems', JSON.stringify(knowledgeItems)); }, [knowledgeItems]);
+  useEffect(() => { localStorage.setItem('leadHistory', JSON.stringify(leadHistory)); }, [leadHistory]);
+  useEffect(() => { localStorage.setItem('commissionPayments', JSON.stringify(commissionPayments)); }, [commissionPayments]);
+  useEffect(() => { localStorage.setItem('suppliers', JSON.stringify(suppliers)); }, [suppliers]);
+  useEffect(() => { if (suppliersSyncUrl) localStorage.setItem('suppliersSyncUrl', suppliersSyncUrl); }, [suppliersSyncUrl]);
   useEffect(() => { if (lastSyncConfig) localStorage.setItem('lastSyncConfig', JSON.stringify(lastSyncConfig)); }, [lastSyncConfig]);
 
-  const addLead = async (leadData: Omit<Lead, 'id' | 'createdAt' | 'status'>) => {
+  const addLead = async (leadData: Omit<Lead, 'id' | 'createdAt' | 'status' | 'updatedAt'>) => {
     const newLead: Lead = {
       ...leadData,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       status: 'NOVO',
     };
     setLeads((prev) => [newLead, ...prev]);
@@ -137,16 +237,20 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     await supabase.from('transactions').insert(newTransaction);
   };
 
-  const updateLeadStatus = async (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string }) => {
+  const updateLeadStatus = async (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string }, observation?: string, changedBy?: { id: string; name: string }) => {
     let updatedLeadFinal: Lead | null = null;
+    let oldStatus: LeadStatus | undefined;
 
     setLeads((prev) =>
       prev.map((lead) => {
         if (lead.id !== leadId) return lead;
+        oldStatus = lead.status;
         const updatedLead: Lead = {
           ...lead,
           status,
-          lostAt: status === 'PERDIDO' ? new Date().toISOString() : undefined
+          observation: observation || lead.observation,
+          updatedAt: new Date().toISOString(),
+          lostAt: status === 'SEM_RESPOSTA' ? new Date().toISOString() : undefined
         };
         if (status === 'GANHO' && saleData) {
           updatedLead.saleValue = saleData.value;
@@ -169,14 +273,31 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
 
     if (updatedLeadFinal) {
       await supabase.from('leads').update(updatedLeadFinal).eq('id', leadId);
+
+      // Record History
+      const historyEntry: LeadHistoryEntry = {
+        id: crypto.randomUUID(),
+        leadId,
+        leadName: (updatedLeadFinal as Lead).name,
+        oldStatus,
+        newStatus: status,
+        observation,
+        changedById: changedBy?.id || '00000000-0000-0000-0000-000000000000',
+        changedByName: changedBy?.name || 'Sistema',
+        createdAt: new Date().toISOString()
+      };
+
+      setLeadHistory(prev => [historyEntry, ...prev]);
+      await supabase.from('lead_history').insert(historyEntry);
     }
   };
 
   const reassignLeads = async (leadIds: string[], sellerId: string) => {
+    const now = new Date().toISOString();
     setLeads(prev => prev.map(lead =>
-      leadIds.includes(lead.id) ? { ...lead, assignedToId: sellerId } : lead
+      leadIds.includes(lead.id) ? { ...lead, assignedToId: sellerId, updatedAt: now } : lead
     ));
-    await supabase.from('leads').update({ assignedToId: sellerId }).in('id', leadIds);
+    await supabase.from('leads').update({ assignedToId: sellerId, updatedAt: now }).in('id', leadIds);
   };
 
   const deleteLeads = async (leadIds: string[]) => {
@@ -233,6 +354,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         classLocation: l.classLocation,
         status: 'NOVO',
         createdAt: leadDate,
+        updatedAt: new Date().toISOString(),
         assignedToId: assignedToId
       };
     });
@@ -257,6 +379,102 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         category: 'Leads',
         classLocation: investmentClassLocation
       });
+    }
+  };
+
+  const payCommission = async (memberId: string, amount: number, type: 'SELLER' | 'TEACHER', memberName: string) => {
+    const paymentId = crypto.randomUUID();
+    const date = new Date().toISOString();
+
+    const paymentEntry: CommissionPaymentRecord = {
+      id: paymentId,
+      memberId,
+      memberName,
+      amount,
+      date,
+      type
+    };
+
+    // 1. Record the payment
+    setCommissionPayments(prev => [paymentEntry, ...prev]);
+    await supabase.from('commission_payments').insert(paymentEntry);
+
+    // 2. Add as expense to finance
+    await addTransaction({
+      type: 'EXPENSE',
+      amount,
+      description: `Pagamento de Comissão - ${memberName} (${type === 'SELLER' ? 'Vendedor' : 'Professor'})`,
+      date,
+      category: 'Comissões',
+    });
+
+    // 3. Mark leads related to this member as paid if Seller
+    if (type === 'SELLER') {
+      const updatedLeads = leads.map(l =>
+        (l.assignedToId === memberId && l.status === 'GANHO' && !l.commissionPaymentId)
+          ? { ...l, commissionPaymentId: paymentId }
+          : l
+      );
+      setLeads(updatedLeads);
+
+      const leadIdsToUpdate = leads
+        .filter(l => l.assignedToId === memberId && l.status === 'GANHO' && !l.commissionPaymentId)
+        .map(l => l.id);
+
+      if (leadIdsToUpdate.length > 0) {
+        await supabase.from('leads').update({ commissionPaymentId: paymentId }).in('id', leadIdsToUpdate);
+      }
+    }
+  };
+
+  const addSupplier = async (supplier: Omit<Supplier, 'id' | 'updatedAt'>) => {
+    const newSupplier: Supplier = {
+      ...supplier,
+      id: crypto.randomUUID(),
+      updatedAt: new Date().toISOString()
+    };
+    setSuppliers(prev => [newSupplier, ...prev]);
+    await supabase.from('suppliers').insert(newSupplier);
+  };
+
+  const removeSupplier = async (id: string) => {
+    if (window.confirm("Remover este fornecedor?")) {
+      setSuppliers(prev => prev.filter(s => s.id !== id));
+      await supabase.from('suppliers').delete().eq('id', id);
+    }
+  };
+
+  const syncSuppliers = async (url: string) => {
+    try {
+      let fetchUrl = url;
+      if (fetchUrl.includes('/edit')) {
+        fetchUrl = fetchUrl.split('/edit')[0] + '/export?format=csv';
+      }
+
+      const response = await fetch(fetchUrl);
+      const csvText = await response.text();
+
+      // Parse CSV
+      const rows = csvText.split('\n').map(row => row.split(','));
+      const newSuppliers: Supplier[] = rows
+        .filter(row => row.length >= 3 && row[0].trim() !== '' && row[0] !== 'Nome') // Skip header or empty
+        .map(row => ({
+          id: crypto.randomUUID(),
+          name: row[0].trim().replace(/^"|"$/g, ''),
+          phone: row[1].trim().replace(/^"|"$/g, ''),
+          category: row[2].trim().replace(/^"|"$/g, ''),
+          price: row[3] ? Number(row[3].trim().replace(/[^\d.]/g, '')) : undefined,
+          updatedAt: new Date().toISOString()
+        }));
+
+      if (newSuppliers.length > 0) {
+        setSuppliers(newSuppliers);
+        setSuppliersSyncUrl(url);
+        await supabase.from('suppliers').delete().neq('id', '0'); // Clear old
+        await supabase.from('suppliers').insert(newSuppliers);
+      }
+    } catch (error) {
+      alert("Erro ao sincronizar fornecedores. Verifique se o link está público.");
     }
   };
 
@@ -338,8 +556,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   return (
     <AppContext.Provider
       value={{
-        leads, transactions, team, knowledgeItems, immersiveClasses, lastSyncConfig, isLoading,
-        addLead, updateLeadStatus, reassignLeads, importLeads, deleteLeads, clearLeads, addTransaction,
+        leads, transactions, team, knowledgeItems, immersiveClasses, leadHistory, commissionPayments, suppliers, suppliersSyncUrl, lastSyncConfig, isLoading,
+        addLead, updateLeadStatus, reassignLeads, importLeads, deleteLeads, clearLeads, addTransaction, payCommission,
+        addSupplier, removeSupplier, syncSuppliers,
         addTeamMember, removeTeamMember, getSalesBySeller, addKnowledgeItem, removeKnowledgeItem,
         syncKnowledgeItem, addClass, updateClass, removeClass
       }}

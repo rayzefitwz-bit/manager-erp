@@ -130,6 +130,58 @@ const ReassignModal = ({ isOpen, onClose, onSubmit, team, leadCount }: any) => {
   );
 };
 
+// Modal for Observation
+const ObservationModal = ({ isOpen, onClose, onSubmit }: any) => {
+  const [observation, setObservation] = useState('');
+  const [error, setError] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = () => {
+    if (!observation.trim()) {
+      setError('O campo não pode ficar em branco');
+      return;
+    }
+    onSubmit(observation);
+    setObservation('');
+    setError('');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70]">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-96 animate-fade-in">
+        <h3 className="text-lg font-bold mb-2">Observação Obrigatória</h3>
+        <p className="text-sm text-gray-500 mb-4">O que você falou com o cliente?</p>
+
+        <div className="space-y-4">
+          <div>
+            <textarea
+              className={`w-full border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 outline-none h-32 resize-none ${error ? 'border-red-500 ring-red-500' : 'focus:ring-blue-500'}`}
+              placeholder="Digite os detalhes da negociação..."
+              value={observation}
+              onChange={e => {
+                setObservation(e.target.value);
+                if (error) setError('');
+              }}
+            />
+            {error && <p className="text-xs text-red-500 mt-1 font-bold">{error}</p>}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <button onClick={() => { onClose(); setObservation(''); setError(''); }} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
+          <button
+            onClick={handleSubmit}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-bold shadow-md"
+          >
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Modal for Delete Confirmation
 const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, count }: any) => {
   if (!isOpen) return null;
@@ -527,10 +579,16 @@ export const CRM = () => {
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSyncConfigModalOpen, setIsSyncConfigModalOpen] = useState(false);
+  const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
 
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // State for handling transitions with observation
+  const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null);
+  const [pendingLeadId, setPendingLeadId] = useState<string | null>(null);
+  const [storedObservation, setStoredObservation] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<LeadStatus | 'ALL'>('ALL');
@@ -546,7 +604,7 @@ export const CRM = () => {
 
   const isAdmin = user?.role === 'ADMIN';
 
-  const statuses: LeadStatus[] = ['NOVO', 'CONTATADO', 'NEGOCIANDO', 'GANHO', 'PERDIDO'];
+  const statuses: LeadStatus[] = ['NOVO', 'LIGACAO', 'WHATSAPP', 'SEM_RESPOSTA', 'NEGOCIANDO', 'GANHO'];
 
   // Filter leads logic
   const filteredLeads = leads.filter(lead => {
@@ -602,19 +660,43 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
   };
 
   const handleStatusChange = (leadId: string, newStatus: string) => {
-    if (newStatus === 'GANHO') {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return;
+
+    if (lead.status === 'NOVO' && newStatus !== 'NOVO') {
+      setPendingLeadId(leadId);
+      setPendingStatus(newStatus as LeadStatus);
+      setIsObservationModalOpen(true);
+    } else {
+      finalizeStatusChange(leadId, newStatus as LeadStatus);
+    }
+  };
+
+  const finalizeStatusChange = (leadId: string, status: LeadStatus, observation?: string) => {
+    if (status === 'GANHO') {
       setActiveLeadId(leadId);
+      if (observation) setStoredObservation(observation);
       setIsWonModalOpen(true);
     } else {
-      updateLeadStatus(leadId, newStatus as LeadStatus);
+      updateLeadStatus(leadId, status, undefined, observation, user ? { id: user.id, name: user.name } : undefined);
+    }
+  };
+
+  const handleObservationSubmit = (observation: string) => {
+    if (pendingLeadId && pendingStatus) {
+      finalizeStatusChange(pendingLeadId, pendingStatus, observation);
+      setIsObservationModalOpen(false);
+      setPendingLeadId(null);
+      setPendingStatus(null);
     }
   };
 
   const handleWonSubmit = (data: any) => {
     if (activeLeadId) {
-      updateLeadStatus(activeLeadId, 'GANHO', data);
+      updateLeadStatus(activeLeadId, 'GANHO', data, storedObservation || undefined, user ? { id: user.id, name: user.name } : undefined);
       setIsWonModalOpen(false);
       setActiveLeadId(null);
+      setStoredObservation(null);
     }
   };
 
@@ -919,6 +1001,7 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
 
       <WonDealModal isOpen={isWonModalOpen} onClose={() => setIsWonModalOpen(false)} onSubmit={handleWonSubmit} team={team} immersiveClasses={immersiveClasses} />
       <ImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleImport} team={team} immersiveClasses={immersiveClasses} />
+      <ObservationModal isOpen={isObservationModalOpen} onClose={() => setIsObservationModalOpen(false)} onSubmit={handleObservationSubmit} />
       <ReassignModal
         isOpen={isReassignModalOpen}
         onClose={() => { setIsReassignModalOpen(false); setActiveLeadId(null); }}

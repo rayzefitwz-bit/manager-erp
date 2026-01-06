@@ -1,5 +1,7 @@
 
-export type LeadStatus = 'NOVO' | 'CONTATADO' | 'NEGOCIANDO' | 'GANHO' | 'PERDIDO';
+export type UserRole = 'ADMIN' | 'VENDEDOR' | 'PROFESSOR';
+
+export type LeadStatus = 'NOVO' | 'LIGACAO' | 'WHATSAPP' | 'SEM_RESPOSTA' | 'NEGOCIANDO' | 'GANHO';
 
 export type Modality = 'ONLINE' | 'PRESENCIAL' | null;
 
@@ -17,6 +19,21 @@ export interface Lead {
   paymentMethod?: string;
   classLocation?: string;
   lostAt?: string;
+  observation?: string;
+  commissionPaymentId?: string;
+  updatedAt: string;
+}
+
+export interface LeadHistoryEntry {
+  id: string;
+  leadId: string;
+  leadName: string;
+  oldStatus?: LeadStatus;
+  newStatus: LeadStatus;
+  observation?: string;
+  changedById: string;
+  changedByName: string;
+  createdAt: string;
 }
 
 export interface Transaction {
@@ -33,8 +50,20 @@ export interface TeamMember {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: UserRole;
   password?: string;
+  commissionRate?: number; // Valor fixo ou % 
+  city?: string; // Para professor
+  date?: string; // Para professor
+}
+
+export interface CommissionPaymentRecord {
+  id: string;
+  memberId: string;
+  memberName: string;
+  amount: number;
+  date: string;
+  type: 'SELLER' | 'TEACHER';
 }
 
 export interface SaleRecord {
@@ -69,4 +98,13 @@ export interface ImmersiveClass {
   city: string;
   date: string;
   immersion: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  category: string;
+  price?: number;
+  updatedAt: string;
 }

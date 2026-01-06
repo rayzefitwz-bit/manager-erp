@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, DollarSign, Award, GraduationCap, UserCog, BookOpen, BarChart3, LogOut, UserX } from 'lucide-react';
+import { LayoutDashboard, Users, DollarSign, Award, GraduationCap, UserCog, BookOpen, BarChart3, LogOut, UserX, History, Truck } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '../context/AuthContext';
 
@@ -34,14 +33,16 @@ export const Sidebar = () => {
       </div>
 
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {isAdmin && <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />}
+        {(isAdmin || user?.role === 'VENDEDOR') && <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />}
         <NavItem to="/crm" icon={Users} label="CRM & Leads" />
         {isAdmin && <NavItem to="/leads-perdidos" icon={UserX} label="Leads Perdidos" />}
         {isAdmin && <NavItem to="/analise" icon={BarChart3} label="Análise Comercial" />}
+        {isAdmin && <NavItem to="/historico" icon={History} label="Histórico" />}
         <NavItem to="/conhecimento" icon={BookOpen} label="Conhecimento" />
         {isAdmin && <NavItem to="/financeiro" icon={DollarSign} label="Financeiro" />}
-        <NavItem to="/comissoes" icon={Award} label="Comissões" />
+        {(isAdmin || user?.role === 'VENDEDOR') && <NavItem to="/comissoes" icon={Award} label="Comissões" />}
         <NavItem to="/turmas" icon={GraduationCap} label="Turmas Ativas" />
+        {isAdmin && <NavItem to="/fornecedores" icon={Truck} label="Fornecedores" />}
         {isAdmin && <NavItem to="/equipe" icon={UserCog} label="Equipe" />}
       </nav>
 
