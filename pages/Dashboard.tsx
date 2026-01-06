@@ -1,3 +1,4 @@
+// Dashboard - Última atualização: Janeiro 2026
 
 import React from 'react';
 import { useApp } from '../context/AppContext';

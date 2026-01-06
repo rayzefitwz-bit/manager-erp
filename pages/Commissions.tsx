@@ -17,7 +17,7 @@ export const Commissions = () => {
   const currentMonthValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [selectedMonth, setSelectedMonth] = useState(currentMonthValue);
 
-  const filterBySelectedMonth = (dateStr: string) => {
+  const filterBySelectedMonth = (dateStr: string | undefined) => {
     if (!dateStr) return false;
     return dateStr.startsWith(selectedMonth);
   };

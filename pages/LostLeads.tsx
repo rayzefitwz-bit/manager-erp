@@ -14,7 +14,7 @@ export const LostLeads = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
     // Filter only lost leads
-    const lostLeads = leads.filter(l => l.status === 'PERDIDO').sort((a, b) => {
+    const lostLeads = leads.filter(l => l.status === 'SEM_RESPOSTA').sort((a, b) => {
         return new Date(b.lostAt || b.createdAt).getTime() - new Date(a.lostAt || a.createdAt).getTime();
     });
 

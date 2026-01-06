@@ -21,7 +21,7 @@ export const SalesAnalysis = () => {
   const sellers = team.filter(m => m.role === 'VENDEDOR');
 
   // Métricas Gerais
-  const totalContacted = leads.filter(l => l.status === 'CONTATADO').length;
+  const totalContacted = leads.filter(l => l.status === 'LIGACAO' || l.status === 'WHATSAPP').length;
   const totalNegotiating = leads.filter(l => l.status === 'NEGOCIANDO').length;
   const totalWon = leads.filter(l => l.status === 'GANHO').length;
   const totalLeads = leads.length;
@@ -32,7 +32,7 @@ export const SalesAnalysis = () => {
     return {
       id: seller.id,
       name: seller.name,
-      contacted: sellerLeads.filter(l => l.status === 'CONTATADO').length,
+      contacted: sellerLeads.filter(l => l.status === 'LIGACAO' || l.status === 'WHATSAPP').length,
       negotiating: sellerLeads.filter(l => l.status === 'NEGOCIANDO').length,
       won: sellerLeads.filter(l => l.status === 'GANHO').length,
       total: sellerLeads.length
@@ -50,29 +50,29 @@ export const SalesAnalysis = () => {
 
       {/* Resumo Geral */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Geral: Contatados" 
-          value={totalContacted} 
-          icon={MessageSquare} 
-          color="bg-yellow-500" 
+        <StatCard
+          title="Geral: Contatados"
+          value={totalContacted}
+          icon={MessageSquare}
+          color="bg-yellow-500"
         />
-        <StatCard 
-          title="Geral: Negociando" 
-          value={totalNegotiating} 
-          icon={Briefcase} 
-          color="bg-purple-600" 
+        <StatCard
+          title="Geral: Negociando"
+          value={totalNegotiating}
+          icon={Briefcase}
+          color="bg-purple-600"
         />
-        <StatCard 
-          title="Geral: Matrículas" 
-          value={totalWon} 
-          icon={UserCheck} 
-          color="bg-green-600" 
+        <StatCard
+          title="Geral: Matrículas"
+          value={totalWon}
+          icon={UserCheck}
+          color="bg-green-600"
         />
-        <StatCard 
-          title="Total de Leads" 
-          value={totalLeads} 
-          icon={Users} 
-          color="bg-blue-600" 
+        <StatCard
+          title="Total de Leads"
+          value={totalLeads}
+          icon={Users}
+          color="bg-blue-600"
         />
       </div>
 
@@ -136,8 +136,8 @@ export const SalesAnalysis = () => {
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <div className="w-16 bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div 
-                          className="bg-green-500 h-full" 
+                        <div
+                          className="bg-green-500 h-full"
                           style={{ width: `${perf.total > 0 ? (perf.won / perf.total) * 100 : 0}%` }}
                         />
                       </div>
@@ -169,25 +169,25 @@ export const SalesAnalysis = () => {
             </p>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <h4 className="font-bold text-gray-800 mb-4">Status Atuais do Funil</h4>
           <div className="space-y-3">
-             {Object.entries(STATUS_LABELS).map(([key, label]) => {
-               const count = leads.filter(l => l.status === key).length;
-               const percent = totalLeads > 0 ? (count / totalLeads) * 100 : 0;
-               return (
-                 <div key={key}>
-                    <div className="flex justify-between text-xs font-bold mb-1">
-                      <span className="text-gray-600 uppercase tracking-tighter">{label}</span>
-                      <span className="text-gray-900">{count}</span>
-                    </div>
-                    <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                       <div className="bg-blue-600 h-full" style={{ width: `${percent}%` }} />
-                    </div>
-                 </div>
-               )
-             })}
+            {Object.entries(STATUS_LABELS).map(([key, label]) => {
+              const count = leads.filter(l => l.status === key).length;
+              const percent = totalLeads > 0 ? (count / totalLeads) * 100 : 0;
+              return (
+                <div key={key}>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-gray-600 uppercase tracking-tighter">{label}</span>
+                    <span className="text-gray-900">{count}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-blue-600 h-full" style={{ width: `${percent}%` }} />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>

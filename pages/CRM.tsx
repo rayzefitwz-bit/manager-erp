@@ -614,7 +614,7 @@ export const CRM = () => {
     }
 
     // 7-day rule for lost leads
-    if (lead.status === 'PERDIDO' && lead.lostAt) {
+    if (lead.status === 'SEM_RESPOSTA' && lead.lostAt) {
       const lostDate = new Date(lead.lostAt);
       const diffTime = Math.abs(new Date().getTime() - lostDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
