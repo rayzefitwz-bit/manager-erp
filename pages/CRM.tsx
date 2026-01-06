@@ -432,6 +432,92 @@ const ImportModal = ({ isOpen, onClose, onImport, team, immersiveClasses }: any)
   );
 };
 
+// Modal for Sync Configuration
+const SyncConfigModal = ({ isOpen, onClose, onConfirm, team }: any) => {
+  const [sheetsUrl, setSheetsUrl] = useState('');
+  const [assignmentType, setAssignmentType] = useState<'SINGLE' | 'EQUAL'>('SINGLE');
+  const [selectedSellerId, setSelectedSellerId] = useState('');
+  const sellers = team.filter((m: any) => m.role === 'VENDEDOR');
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-[500px] animate-fade-in">
+        <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+          <RefreshCw className="w-5 h-5 text-indigo-600" />
+          Configurar Sincronização Automática
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Insira o link da planilha do Google Sheets para ativar a sincronização.
+          Esta configuração ficará salva neste dispositivo.
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Link do Google Sheets (Público)</label>
+            <div className="relative">
+              <Link className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={sheetsUrl}
+                onChange={e => setSheetsUrl(e.target.value)}
+                className="w-full pl-9 border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="https://docs.google.com/spreadsheets/d/..."
+              />
+            </div>
+          </div>
+
+          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4" /> Distribuição Automática
+            </label>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <button
+                onClick={() => setAssignmentType('SINGLE')}
+                className={`flex flex-col items-center justify-center p-3 rounded-lg border text-xs font-medium transition-all ${assignmentType === 'SINGLE' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+              >
+                <UserCheck className="w-4 h-4 mb-1" /> Um Consultor
+              </button>
+              <button
+                onClick={() => setAssignmentType('EQUAL')}
+                className={`flex flex-col items-center justify-center p-3 rounded-lg border text-xs font-medium transition-all ${assignmentType === 'EQUAL' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+              >
+                <Shuffle className="w-4 h-4 mb-1" /> Dividir Todos
+              </button>
+            </div>
+
+            {assignmentType === 'SINGLE' && (
+              <div className="animate-fade-in">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Consultor Responsável</label>
+                <select
+                  className="w-full border p-2 rounded text-sm"
+                  value={selectedSellerId}
+                  onChange={e => setSelectedSellerId(e.target.value)}
+                >
+                  <option value="">Selecione...</option>
+                  {sellers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
+          <button
+            onClick={() => onConfirm(sheetsUrl, assignmentType, selectedSellerId)}
+            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-bold shadow-md"
+            disabled={!sheetsUrl || (assignmentType === 'SINGLE' && !selectedSellerId)}
+          >
+            Salvar e Sincronizar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const CRM = () => {
   const { leads, updateLeadStatus, reassignLeads, importLeads, deleteLeads, team, addLead, lastSyncConfig, immersiveClasses } = useApp();
   const { user } = useAuth();
@@ -440,6 +526,7 @@ export const CRM = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSyncConfigModalOpen, setIsSyncConfigModalOpen] = useState(false);
 
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -550,13 +637,25 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
     setIsImportModalOpen(false);
   };
 
-  const handleSync = async () => {
-    if (!lastSyncConfig) return;
+  const handleSyncClick = () => {
+    if (lastSyncConfig) {
+      handleSync(lastSyncConfig.url, { type: lastSyncConfig.assignmentType || 'SINGLE', sellerId: lastSyncConfig.sellerId });
+    } else {
+      setIsSyncConfigModalOpen(true);
+    }
+  };
+
+  const handleSyncConfigSubmit = (url: string, type: 'SINGLE' | 'EQUAL', sellerId: string) => {
+    handleSync(url, { type, sellerId });
+    setIsSyncConfigModalOpen(false);
+  };
+
+  const handleSync = async (url: string, assignmentConfig: any) => {
     setIsSyncing(true);
     try {
-      let url = lastSyncConfig.url;
-      if (url.includes('/edit')) url = url.split('/edit')[0] + '/export?format=csv';
-      const response = await fetch(url);
+      let fetchUrl = url;
+      if (fetchUrl.includes('/edit')) fetchUrl = fetchUrl.split('/edit')[0] + '/export?format=csv';
+      const response = await fetch(fetchUrl);
       const text = await response.text();
       const rows = text.split('\n').map(line => line.split(',').map(c => c.replace(/"/g, '')));
       const parsed = rows
@@ -572,8 +671,13 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
           };
         })
         .filter(item => item !== null && item.name !== '' && item.phone !== '') as Array<{ name: string; phone: string; role?: string; classLocation?: string; createdAt?: string }>;
-      importLeads(parsed, 0, { type: 'SINGLE', sellerId: lastSyncConfig.sellerId }, lastSyncConfig.url);
-    } catch (error) { alert("Erro na sincronização."); } finally { setIsSyncing(false); }
+
+      importLeads(parsed, 0, assignmentConfig, url);
+    } catch (error) {
+      alert("Erro na sincronização. Verifique o link e tente novamente.");
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const toggleLeadSelection = (leadId: string) => {
@@ -619,6 +723,12 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
 
   return (
     <div className="h-full flex flex-col relative">
+      <SyncConfigModal
+        isOpen={isSyncConfigModalOpen}
+        onClose={() => setIsSyncConfigModalOpen(false)}
+        onConfirm={handleSyncConfigSubmit}
+        team={team}
+      />
       {/* Bulk Actions Bar */}
       {isAdmin && selectedLeads.length > 0 && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 bg-blue-700 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-6 animate-fade-in border border-blue-600">
@@ -655,15 +765,14 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
           {isAdmin && <p className="text-xs text-gray-400 font-medium">Administrador: Controle total de atribuição e fluxo.</p>}
         </div>
         <div className="flex gap-2">
-          {lastSyncConfig && (
-            <button
-              onClick={handleSync} disabled={isSyncing}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm transition-all text-sm font-bold"
-            >
-              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
-            </button>
-          )}
+          <button
+            onClick={handleSyncClick}
+            disabled={isSyncing}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-all text-sm font-bold ${lastSyncConfig ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'}`}
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Sincronizando...' : (lastSyncConfig ? 'Sincronizar' : 'Configurar Sync')}
+          </button>
           <button onClick={() => setShowNewLeadForm(!showNewLeadForm)} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm transition-all text-sm font-bold">
             <Plus className="w-4 h-4" /> Novo Lead
           </button>

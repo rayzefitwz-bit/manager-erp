@@ -6,7 +6,8 @@ import { supabase } from '../supabase';
 
 interface SyncConfig {
   url: string;
-  sellerId: string;
+  sellerId?: string;
+  assignmentType: 'SINGLE' | 'EQUAL' | 'NONE';
 }
 
 interface AppContextType {
@@ -239,8 +240,12 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     setLeads((prev) => [...newLeads, ...prev]);
     await supabase.from('leads').insert(newLeads);
 
-    if (sheetsUrl && assignmentConfig?.sellerId) {
-      setLastSyncConfig({ url: sheetsUrl, sellerId: assignmentConfig.sellerId });
+    if (sheetsUrl && assignmentConfig) {
+      setLastSyncConfig({
+        url: sheetsUrl,
+        sellerId: assignmentConfig.sellerId,
+        assignmentType: assignmentConfig.type
+      });
     }
 
     if (totalImportCost > 0) {
