@@ -15,6 +15,7 @@ export interface Lead {
   modality?: Modality;
   paymentMethod?: string;
   classLocation?: string;
+  lostAt?: string;
 }
 
 export interface Transaction {

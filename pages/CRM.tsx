@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { LeadStatus, Lead, Modality, ImmersiveClass } from '../types';
 import { STATUS_LABELS, STATUS_COLORS } from '../constants';
-import { MessageCircle, FileUp, MoreHorizontal, Plus, Users, Shuffle, UserCheck, Link, Globe, RefreshCw, Calendar, Target, UserPlus, CheckSquare, Square, XCircle } from 'lucide-react';
+import { MessageCircle, FileUp, MoreHorizontal, Plus, Users, Shuffle, UserCheck, Link, Globe, RefreshCw, Calendar, Target, UserPlus, CheckSquare, Square, XCircle, Trash2 } from 'lucide-react';
 import { read, utils } from 'xlsx';
 
 // Modal for Won Deal
@@ -123,6 +123,31 @@ const ReassignModal = ({ isOpen, onClose, onSubmit, team, leadCount }: any) => {
             disabled={!sellerId}
           >
             Confirmar Transferência
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Modal for Delete Confirmation
+const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, count }: any) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-96 animate-fade-in">
+        <h3 className="text-lg font-bold mb-2 text-red-600">⚠️ Confirmar Deleção</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Tem certeza que deseja deletar <strong>{count} lead{count > 1 ? 's' : ''}</strong>?
+          Esta ação não pode ser desfeita.
+        </p>
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">
+            Cancelar
+          </button>
+          <button onClick={onConfirm} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-bold">
+            Deletar
           </button>
         </div>
       </div>
@@ -408,12 +433,13 @@ const ImportModal = ({ isOpen, onClose, onImport, team, immersiveClasses }: any)
 };
 
 export const CRM = () => {
-  const { leads, updateLeadStatus, reassignLeads, importLeads, team, addLead, lastSyncConfig, immersiveClasses } = useApp();
+  const { leads, updateLeadStatus, reassignLeads, importLeads, deleteLeads, team, addLead, lastSyncConfig, immersiveClasses } = useApp();
   const { user } = useAuth();
 
   const [isWonModalOpen, setIsWonModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -430,10 +456,34 @@ export const CRM = () => {
 
   const statuses: LeadStatus[] = ['NOVO', 'CONTATADO', 'NEGOCIANDO', 'GANHO', 'PERDIDO'];
 
-  const filteredLeads = isAdmin
-    ? leads
-    : leads.filter(l => l.assignedToId === user?.id);
+  // Filter leads logic
+  const filteredLeads = leads.filter(lead => {
+    // Visibility Check (Admin sees all, Seller sees only theirs)
+    if (!isAdmin && lead.assignedToId !== user?.id) {
+      return false;
+    }
 
+    // 7-day rule for lost leads
+    if (lead.status === 'PERDIDO' && lead.lostAt) {
+      const lostDate = new Date(lead.lostAt);
+      const diffTime = Math.abs(new Date().getTime() - lostDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 7) return false;
+    }
+
+    // Search filter
+    const matchesSearch =
+      lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.phone.includes(searchTerm) ||
+      (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    // Advanced filters
+    const matchesStatus = filterStatus === 'ALL' || lead.status === filterStatus;
+    const matchesSeller = filterSeller === 'ALL' || lead.assignedToId === filterSeller;
+    const matchesDate = !filterDate ? true : lead.createdAt.startsWith(filterDate);
+
+    return matchesSearch && matchesStatus && matchesSeller && matchesDate;
+  });
   const getWhatsAppLink = (lead: Lead, sellerName: string = 'Consultor') => {
     const cleanPhone = lead.phone.replace(/\D/g, '');
     const city = lead.classLocation || '';
@@ -481,6 +531,12 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
     reassignLeads(targets, sellerId);
     setIsReassignModalOpen(false);
     setActiveLeadId(null);
+    setSelectedLeads([]);
+  };
+
+  const handleDeleteLeads = () => {
+    deleteLeads(selectedLeads);
+    setIsDeleteModalOpen(false);
     setSelectedLeads([]);
   };
 
@@ -571,6 +627,12 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
               className="flex items-center gap-2 bg-white text-blue-700 px-4 py-1.5 rounded-lg font-bold text-xs hover:bg-blue-50 transition-colors"
             >
               <UserPlus className="w-4 h-4" /> Transferir Vendedor
+            </button>
+            <button
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="flex items-center gap-2 bg-red-600 text-white px-4 py-1.5 rounded-lg font-bold text-xs hover:bg-red-700 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" /> Deletar
             </button>
             <button
               onClick={() => setSelectedLeads([])}
@@ -750,6 +812,13 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
         team={team}
         leadCount={activeLeadId ? 1 : selectedLeads.length}
       />
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteLeads}
+        count={selectedLeads.length}
+      />
     </div>
   );
 };
+```

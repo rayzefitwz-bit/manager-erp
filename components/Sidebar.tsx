@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, DollarSign, Award, GraduationCap, UserCog, BookOpen, BarChart3, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, DollarSign, Award, GraduationCap, UserCog, BookOpen, BarChart3, LogOut, UserX } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '../context/AuthContext';
 
@@ -36,6 +36,7 @@ export const Sidebar = () => {
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {isAdmin && <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />}
         <NavItem to="/crm" icon={Users} label="CRM & Leads" />
+        {isAdmin && <NavItem to="/leads-perdidos" icon={UserX} label="Leads Perdidos" />}
         {isAdmin && <NavItem to="/analise" icon={BarChart3} label="Análise Comercial" />}
         <NavItem to="/conhecimento" icon={BookOpen} label="Conhecimento" />
         {isAdmin && <NavItem to="/financeiro" icon={DollarSign} label="Financeiro" />}
@@ -54,7 +55,7 @@ export const Sidebar = () => {
             <p className="text-xs text-gray-500 truncate">{user?.email}</p>
           </div>
         </div>
-        <button 
+        <button
           onClick={logout}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors"
         >

@@ -12,6 +12,7 @@ import { Classes } from './pages/Classes';
 import { Team } from './pages/Team';
 import { KnowledgeBase } from './pages/KnowledgeBase';
 import { SalesAnalysis } from './pages/SalesAnalysis';
+import { LostLeads } from './pages/LostLeads';
 import { Login } from './pages/Login';
 
 const ProtectedRoutes = () => {
@@ -27,19 +28,20 @@ const ProtectedRoutes = () => {
       <Routes>
         {/* Vendedores são redirecionados para o CRM se tentarem acessar a raiz */}
         <Route path="/" element={isAdmin ? <Dashboard /> : <Navigate to="/crm" replace />} />
-        
+
         <Route path="/crm" element={<CRM />} />
-        
+
         {/* Rotas restritas apenas para ADMIN */}
         <Route path="/analise" element={isAdmin ? <SalesAnalysis /> : <Navigate to="/crm" replace />} />
         <Route path="/financeiro" element={isAdmin ? <Finance /> : <Navigate to="/crm" replace />} />
         <Route path="/equipe" element={isAdmin ? <Team /> : <Navigate to="/crm" replace />} />
-        
+        <Route path="/leads-perdidos" element={isAdmin ? <LostLeads /> : <Navigate to="/crm" replace />} />
+
         {/* Rotas abertas para Vendedor e Admin */}
         <Route path="/conhecimento" element={<KnowledgeBase />} />
         <Route path="/comissoes" element={<Commissions />} />
         <Route path="/turmas" element={<Classes />} />
-        
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

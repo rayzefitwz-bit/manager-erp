@@ -21,6 +21,7 @@ interface AppContextType {
   updateLeadStatus: (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string }) => void;
   reassignLeads: (leadIds: string[], sellerId: string) => void;
   importLeads: (leadsData: Array<{ name: string; phone: string; role?: string; classLocation?: string; createdAt?: string }>, totalImportCost: number, assignmentConfig?: { type: 'SINGLE' | 'EQUAL', sellerId?: string }, sheetsUrl?: string, investmentClassLocation?: string) => void;
+  deleteLeads: (leadIds: string[]) => void;
   clearLeads: () => void;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   addTeamMember: (member: Omit<TeamMember, 'id'>) => void;
@@ -137,11 +138,15 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
 
   const updateLeadStatus = async (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string }) => {
     let updatedLeadFinal: Lead | null = null;
-    
+
     setLeads((prev) =>
       prev.map((lead) => {
         if (lead.id !== leadId) return lead;
-        const updatedLead: Lead = { ...lead, status };
+        const updatedLead: Lead = {
+          ...lead,
+          status,
+          lostAt: status === 'PERDIDO' ? new Date().toISOString() : undefined
+        };
         if (status === 'GANHO' && saleData) {
           updatedLead.saleValue = saleData.value;
           updatedLead.modality = saleData.modality;
@@ -162,27 +167,32 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     );
 
     if (updatedLeadFinal) {
-        await supabase.from('leads').update(updatedLeadFinal).eq('id', leadId);
+      await supabase.from('leads').update(updatedLeadFinal).eq('id', leadId);
     }
   };
 
   const reassignLeads = async (leadIds: string[], sellerId: string) => {
-    setLeads(prev => prev.map(lead => 
+    setLeads(prev => prev.map(lead =>
       leadIds.includes(lead.id) ? { ...lead, assignedToId: sellerId } : lead
     ));
     await supabase.from('leads').update({ assignedToId: sellerId }).in('id', leadIds);
+  };
+
+  const deleteLeads = async (leadIds: string[]) => {
+    setLeads(prev => prev.filter(lead => !leadIds.includes(lead.id)));
+    await supabase.from('leads').delete().in('id', leadIds);
   };
 
   const clearLeads = async () => {
     if (window.confirm("Tem certeza que deseja excluir TODOS os leads? Esta ação não pode ser desfeita.")) {
       setLeads([]);
       localStorage.removeItem('leads');
-      await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000'); 
+      await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     }
   };
 
   const importLeads = async (
-    leadsData: Array<{ name: string; phone: string; role?: string; classLocation?: string; createdAt?: string }>, 
+    leadsData: Array<{ name: string; phone: string; role?: string; classLocation?: string; createdAt?: string }>,
     totalImportCost: number,
     assignmentConfig?: { type: 'SINGLE' | 'EQUAL', sellerId?: string },
     sheetsUrl?: string,
@@ -191,13 +201,13 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     const sellers = team.filter(m => m.role === 'VENDEDOR');
     const existingPhones = new Set(leads.map(l => l.phone.replace(/\D/g, '')));
     const newLeadsData = leadsData.filter(l => {
-        const cleanPhone = l.phone.replace(/\D/g, '');
-        return !existingPhones.has(cleanPhone);
+      const cleanPhone = l.phone.replace(/\D/g, '');
+      return !existingPhones.has(cleanPhone);
     });
 
     if (newLeadsData.length === 0 && leadsData.length > 0) {
-        alert("Nenhum lead novo encontrado.");
-        return;
+      alert("Nenhum lead novo encontrado.");
+      return;
     }
 
     const newLeads: Lead[] = newLeadsData.map((l, index) => {
@@ -273,7 +283,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   const removeKnowledgeItem = async (id: string) => {
-    if(window.confirm("Remover este item?")) {
+    if (window.confirm("Remover este item?")) {
       setKnowledgeItems(prev => prev.filter(i => i.id !== id));
       await supabase.from('knowledge_items').delete().eq('id', id);
     }
@@ -293,7 +303,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
 
       const response = await fetch(fetchUrl);
       const text = await response.text();
-      
+
       const updatedAt = new Date().toISOString();
       setKnowledgeItems(prev => prev.map(i => i.id === id ? { ...i, content: text, updatedAt } : i));
       await supabase.from('knowledge_items').update({ content: text, updatedAt }).eq('id', id);
@@ -324,7 +334,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     <AppContext.Provider
       value={{
         leads, transactions, team, knowledgeItems, immersiveClasses, lastSyncConfig, isLoading,
-        addLead, updateLeadStatus, reassignLeads, importLeads, clearLeads, addTransaction,
+        addLead, updateLeadStatus, reassignLeads, importLeads, deleteLeads, clearLeads, addTransaction,
         addTeamMember, removeTeamMember, getSalesBySeller, addKnowledgeItem, removeKnowledgeItem,
         syncKnowledgeItem, addClass, updateClass, removeClass
       }}
