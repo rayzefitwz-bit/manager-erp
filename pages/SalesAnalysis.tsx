@@ -23,8 +23,8 @@ export const SalesAnalysis = () => {
   // Métricas Gerais
   const totalContacted = leads.filter(l => l.status === 'LIGACAO' || l.status === 'WHATSAPP').length;
   const totalNegotiating = leads.filter(l => l.status === 'NEGOCIANDO').length;
-  const totalWon = leads.filter(l => l.status === 'GANHO' && !l.hasDownPayment).length;
-  const totalDownPayments = leads.filter(l => l.status === 'GANHO' && l.hasDownPayment).length;
+  const totalWon = leads.filter(l => l.status === 'GANHO').length;
+  const totalDownPayments = leads.filter(l => l.status === 'SINAL').length;
   const totalLeads = leads.length;
 
   // Breakdown por Vendedor
@@ -35,8 +35,8 @@ export const SalesAnalysis = () => {
       name: seller.name,
       contacted: sellerLeads.filter(l => l.status === 'LIGACAO' || l.status === 'WHATSAPP').length,
       negotiating: sellerLeads.filter(l => l.status === 'NEGOCIANDO').length,
-      won: sellerLeads.filter(l => l.status === 'GANHO' && !l.hasDownPayment).length,
-      downPayments: sellerLeads.filter(l => l.status === 'GANHO' && l.hasDownPayment).length,
+      won: sellerLeads.filter(l => l.status === 'GANHO').length,
+      downPayments: sellerLeads.filter(l => l.status === 'SINAL').length,
       total: sellerLeads.length
     };
   }).sort((a, b) => (b.contacted + b.negotiating) - (a.contacted + a.negotiating));

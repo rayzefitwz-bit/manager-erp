@@ -100,7 +100,7 @@ export const Dashboard = () => {
   const generalCAC = totalWonLeads > 0 ? (totalLeadInvestment / totalWonLeads) : 0;
 
   // Valores a Receber (Sinais Pendentes)
-  const downPaymentLeads = leads.filter(l => l.status === 'GANHO' && l.hasDownPayment);
+  const downPaymentLeads = leads.filter(l => l.status === 'SINAL');
   const totalReceivables = downPaymentLeads.reduce((acc, curr) => acc + (curr.remainingBalance || 0), 0);
 
   // Análise de CAC por Turma
@@ -130,6 +130,7 @@ export const Dashboard = () => {
   const leadStatusData = [
     { name: 'Novos', value: leads.filter(l => l.status === 'NOVO').length },
     { name: 'Negociando', value: leads.filter(l => l.status === 'NEGOCIANDO').length },
+    { name: 'Sinais', value: leads.filter(l => l.status === 'SINAL').length },
     { name: 'Ganhos', value: totalWonLeads },
     { name: 'Não Responde', value: leads.filter(l => l.status === 'SEM_RESPOSTA').length },
   ];
@@ -393,8 +394,8 @@ export const Dashboard = () => {
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${item.type === 'INCOME' ? 'bg-green-50 text-green-600' :
-                            item.type === 'EXPENSE' ? 'bg-red-50 text-red-600' :
-                              'bg-blue-50 text-blue-600'
+                          item.type === 'EXPENSE' ? 'bg-red-50 text-red-600' :
+                            'bg-blue-50 text-blue-600'
                           }`}>
                           {item.type === 'INCOME' ? <TrendingUp className="w-3.5 h-3.5" /> :
                             item.type === 'EXPENSE' ? <TrendingDown className="w-3.5 h-3.5" /> :

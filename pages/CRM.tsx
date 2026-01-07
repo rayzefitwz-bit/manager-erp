@@ -16,37 +16,23 @@ const WonDealModal = ({ isOpen, onClose, onSubmit, team, immersiveClasses }: any
   const [classLocation, setClassLocation] = useState(immersiveClasses[0]?.city || 'Curitiba');
   const [payment, setPayment] = useState('PIX');
   const [sellerId, setSellerId] = useState('');
-  const [hasDownPayment, setHasDownPayment] = useState(false);
-  const [downPaymentValue, setDownPaymentValue] = useState('');
 
   if (!isOpen) return null;
 
-  const totalValue = Number(value) || 0;
-  const downValue = Number(downPaymentValue) || 0;
-  const remainingBalance = hasDownPayment ? totalValue - downValue : 0;
-
   const handleSubmit = () => {
-    const data: any = {
-      value: totalValue,
+    onSubmit({
+      value: Number(value) || 0,
       modality,
       paymentMethod: payment,
       sellerId,
       classLocation
-    };
-
-    if (hasDownPayment) {
-      data.hasDownPayment = true;
-      data.downPaymentValue = downValue;
-      data.remainingBalance = remainingBalance;
-    }
-
-    onSubmit(data);
+    });
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-xl w-96 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-lg font-bold mb-4">Registrar Venda</h3>
+        <h3 className="text-lg font-bold mb-4">Registrar Venda Completa</h3>
 
         <div className="space-y-3">
           <div>
@@ -59,45 +45,6 @@ const WonDealModal = ({ isOpen, onClose, onSubmit, team, immersiveClasses }: any
               placeholder="0.00"
             />
           </div>
-
-          {/* Botão de Sinal de Entrada */}
-          <div>
-            <button
-              type="button"
-              onClick={() => {
-                setHasDownPayment(!hasDownPayment);
-                if (hasDownPayment) setDownPaymentValue('');
-              }}
-              className={`w-full py-2.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${hasDownPayment
-                ? 'bg-amber-100 text-amber-700 border-2 border-amber-400'
-                : 'bg-gray-100 text-gray-600 border-2 border-gray-300 hover:bg-gray-200'
-                }`}
-            >
-              {hasDownPayment ? '✓ ' : ''}Aluno deu um sinal de entrada
-            </button>
-          </div>
-
-          {/* Campo de Sinal - Condicional */}
-          {hasDownPayment && (
-            <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 space-y-2 animate-fade-in">
-              <div>
-                <label className="block text-xs font-bold text-amber-800 mb-1">Valor do Sinal (R$)</label>
-                <input
-                  type="number"
-                  className="w-full border border-amber-300 p-2 rounded text-sm focus:ring-2 focus:ring-amber-400 outline-none"
-                  value={downPaymentValue}
-                  onChange={e => setDownPaymentValue(e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
-              {downValue > 0 && totalValue > 0 && (
-                <div className="text-xs bg-white p-2 rounded border border-amber-200">
-                  <span className="text-gray-600">Saldo Restante: </span>
-                  <span className="font-bold text-amber-700">R$ {remainingBalance.toLocaleString()}</span>
-                </div>
-              )}
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Vendedor</label>
@@ -144,9 +91,120 @@ const WonDealModal = ({ isOpen, onClose, onSubmit, team, immersiveClasses }: any
           <button
             onClick={handleSubmit}
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            disabled={!value || !sellerId || (hasDownPayment && (!downPaymentValue || downValue >= totalValue))}
+            disabled={!value || !sellerId}
           >
             Confirmar Venda
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Modal for Sinal de Venda (New)
+const SinalDealModal = ({ isOpen, onClose, onSubmit, team, immersiveClasses }: any) => {
+  const [totalValue, setTotalValue] = useState('');
+  const [sinalValue, setSinalValue] = useState('');
+  const [modality, setModality] = useState<Modality>('PRESENCIAL');
+  const [classLocation, setClassLocation] = useState(immersiveClasses[0]?.city || 'Curitiba');
+  const [payment, setPayment] = useState('PIX');
+  const [sellerId, setSellerId] = useState('');
+
+  if (!isOpen) return null;
+
+  const total = Number(totalValue) || 0;
+  const sinal = Number(sinalValue) || 0;
+  const remaining = total - sinal;
+
+  const handleSubmit = () => {
+    onSubmit({
+      value: total,
+      downPaymentValue: sinal,
+      remainingBalance: remaining,
+      modality,
+      paymentMethod: payment,
+      sellerId,
+      classLocation,
+      hasDownPayment: true
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-96 max-h-[90vh] overflow-y-auto">
+        <h3 className="text-lg font-bold mb-4">Registrar Sinal de Venda</h3>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Valor Total da Venda (R$)</label>
+            <input
+              type="number"
+              className="w-full border p-2 rounded"
+              value={totalValue}
+              onChange={e => setTotalValue(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-amber-700 mb-1">Valor do Sinal (R$)</label>
+            <input
+              type="number"
+              className="w-full border-2 border-amber-300 p-2 rounded bg-amber-50"
+              value={sinalValue}
+              onChange={e => setSinalValue(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+
+          {total > 0 && sinal > 0 && (
+            <div className="p-3 bg-gray-50 rounded border border-dashed border-gray-300 text-xs font-bold text-gray-500">
+              Saldo Restante: <span className="text-amber-600">R$ {remaining.toLocaleString()}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Vendedor</label>
+            <select className="w-full border p-2 rounded" value={sellerId} onChange={e => setSellerId(e.target.value)}>
+              <option value="">Selecione...</option>
+              {team.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Turma / Localidade</label>
+            <select
+              className="w-full border p-2 rounded"
+              value={classLocation}
+              onChange={e => {
+                setClassLocation(e.target.value);
+                setModality(e.target.value.toLowerCase() === 'online' ? 'ONLINE' : 'PRESENCIAL');
+              }}
+            >
+              {immersiveClasses.map((cls: ImmersiveClass) => (
+                <option key={cls.id} value={cls.city}>{cls.city}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Forma Pagamento (do Sinal)</label>
+            <select className="w-full border p-2 rounded" value={payment} onChange={e => setPayment(e.target.value)}>
+              <option value="PIX">Pix</option>
+              <option value="CARTAO">Cartão de Crédito</option>
+              <option value="BOLETO">Boleto</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded font-medium">Cancelar</button>
+          <button
+            onClick={handleSubmit}
+            className="px-6 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 font-bold shadow-md shadow-amber-200"
+            disabled={!totalValue || !sinalValue || !sellerId || sinal >= total}
+          >
+            Registrar Sinal
           </button>
         </div>
       </div>
@@ -730,6 +788,7 @@ export const CRM = () => {
 
   // States
   const [isWonModalOpen, setIsWonModalOpen] = useState(false);
+  const [isSinalModalOpen, setIsSinalModalOpen] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
   const [pendingLeadId, setPendingLeadId] = useState<string | null>(null);
@@ -760,7 +819,7 @@ export const CRM = () => {
 
   const isAdmin = user?.role === 'ADMIN';
 
-  const statuses: LeadStatus[] = ['NOVO', 'LIGACAO', 'WHATSAPP', 'SEM_RESPOSTA', 'NEGOCIANDO', 'GANHO'];
+  const statuses: LeadStatus[] = ['NOVO', 'LIGACAO', 'WHATSAPP', 'SEM_RESPOSTA', 'NEGOCIANDO', 'SINAL', 'GANHO'];
 
   // Filter leads logic
   const filteredLeads = leads.filter(lead => {
@@ -815,6 +874,7 @@ export const CRM = () => {
       'WHATSAPP': 0,
       'SEM_RESPOSTA': 0,
       'NEGOCIANDO': 0,
+      'SINAL': 0,
       'GANHO': 0
     };
 
@@ -883,10 +943,29 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
   };
 
   const finalizeStatusChange = (leadId: string, status: LeadStatus, observation?: string) => {
+    const lead = leads.find(l => l.id === leadId);
+
     if (status === 'GANHO') {
+      if (lead?.status === 'SINAL') {
+        // Se já era SINAL, move direto para GANHO (quita o sinal)
+        updateLeadStatus(leadId, 'GANHO', undefined, observation, user ? { id: user.id, name: user.name } : undefined);
+
+        // Efeito de Confete ao quitar sinal
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff']
+        });
+      } else {
+        setActiveLeadId(leadId);
+        if (observation) setStoredObservation(observation);
+        setIsWonModalOpen(true);
+      }
+    } else if (status === 'SINAL') {
       setActiveLeadId(leadId);
       if (observation) setStoredObservation(observation);
-      setIsWonModalOpen(true);
+      setIsSinalModalOpen(true);
     } else {
       updateLeadStatus(leadId, status, undefined, observation, user ? { id: user.id, name: user.name } : undefined);
     }
@@ -905,6 +984,15 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
     if (activeLeadId) {
       updateLeadStatus(activeLeadId, 'GANHO', data, storedObservation || undefined, user ? { id: user.id, name: user.name } : undefined);
       setIsWonModalOpen(false);
+      setActiveLeadId(null);
+      setStoredObservation(null);
+    }
+  };
+
+  const handleSinalSubmit = (data: any) => {
+    if (activeLeadId) {
+      updateLeadStatus(activeLeadId, 'SINAL', data, storedObservation || undefined, user ? { id: user.id, name: user.name } : undefined);
+      setIsSinalModalOpen(false);
       setActiveLeadId(null);
       setStoredObservation(null);
     }
@@ -1280,13 +1368,9 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                                   <span className="text-red-700 font-bold">Saldo Restante:</span>
                                   <span className="font-black text-red-600">R$ {(lead.remainingBalance || 0).toLocaleString()}</span>
                                 </div>
-                                <button
-                                  onClick={() => handleSettleClick(lead)}
-                                  className="mt-1 w-full flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-2 py-1.5 rounded font-bold text-[10px] shadow-sm transition-all transform active:scale-95"
-                                >
-                                  <DollarSign className="w-3 h-3" />
-                                  Receber Restante (R$ {(lead.remainingBalance || 0).toLocaleString()})
-                                </button>
+                                <div className="text-[9px] text-amber-600 font-bold text-center mt-1 animate-pulse italic">
+                                  Arraste para "Fechados" para quitar
+                                </div>
                               </>
                             ) : (
                               <div className="flex justify-between items-center">
@@ -1309,6 +1393,14 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
         isOpen={isWonModalOpen}
         onClose={() => setIsWonModalOpen(false)}
         onSubmit={handleWonSubmit}
+        team={team}
+        immersiveClasses={immersiveClasses}
+      />
+
+      <SinalDealModal
+        isOpen={isSinalModalOpen}
+        onClose={() => setIsSinalModalOpen(false)}
+        onSubmit={handleSinalSubmit}
         team={team}
         immersiveClasses={immersiveClasses}
       />

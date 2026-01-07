@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Lead, Transaction, TeamMember, LeadStatus, SaleRecord, Modality, KnowledgeItem, ImmersiveClass, LeadHistoryEntry, CommissionPaymentRecord, Supplier } from '../types';
-import { MOCK_TEAM } from '../constants';
+import { MOCK_TEAM, STATUS_LABELS } from '../constants';
 import { supabase } from '../supabase';
 import { CheckCircle, Info, AlertCircle } from 'lucide-react';
 
@@ -282,36 +282,69 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       observation: observation || lead.observation,
       updatedAt: new Date().toISOString(),
       lostAt: status === 'SEM_RESPOSTA' ? new Date().toISOString() : undefined,
-      wonAt: status === 'GANHO' ? new Date().toISOString() : lead.wonAt
+      wonAt: (status === 'GANHO' || status === 'SINAL') ? new Date().toISOString() : lead.wonAt
     };
 
-    if (status === 'GANHO' && saleData) {
+    // Handle SINAL Status
+    if (status === 'SINAL' && saleData) {
       updatedLead.saleValue = saleData.value;
+      updatedLead.hasDownPayment = true;
+      updatedLead.downPaymentValue = saleData.downPaymentValue;
+      updatedLead.remainingBalance = saleData.remainingBalance;
       updatedLead.modality = saleData.modality;
       updatedLead.paymentMethod = saleData.paymentMethod;
       updatedLead.assignedToId = saleData.sellerId;
       updatedLead.classLocation = saleData.classLocation;
 
-      // Down Payment Logic
-      if (saleData.hasDownPayment) {
-        updatedLead.hasDownPayment = true;
-        updatedLead.downPaymentValue = saleData.downPaymentValue;
-        updatedLead.remainingBalance = saleData.remainingBalance;
-      } else {
-        updatedLead.hasDownPayment = false;
-        updatedLead.downPaymentValue = undefined;
-        updatedLead.remainingBalance = undefined;
-      }
-
       addTransaction({
         type: 'INCOME',
-        amount: saleData.hasDownPayment ? (saleData.downPaymentValue || 0) : saleData.value,
-        description: saleData.hasDownPayment
-          ? `Sinal Imersão - ${lead.name} (${saleData.classLocation})`
-          : `Venda Imersão - ${lead.name} (${saleData.classLocation})`,
+        amount: saleData.downPaymentValue || 0,
+        description: `Sinal Imersão - ${lead.name} (${saleData.classLocation})`,
         date: new Date().toISOString(),
         category: 'Vendas',
+        paymentMethod: saleData.paymentMethod
       });
+    }
+
+    // Handle GANHO Status
+    if (status === 'GANHO') {
+      if (oldStatus === 'SINAL') {
+        // Transition from SINAL to GANHO: Use existing data and settle balance
+        updatedLead.hasDownPayment = false;
+
+        const remaining = lead.remainingBalance || 0;
+        if (remaining > 0) {
+          addTransaction({
+            type: 'INCOME',
+            amount: remaining,
+            description: `Quit. Matrícula (Sinal Pago) - ${lead.name} (${lead.classLocation})`,
+            date: new Date().toISOString(),
+            category: 'Vendas',
+            paymentMethod: lead.paymentMethod
+          });
+        }
+
+        updatedLead.remainingBalance = 0;
+        updatedLead.downPaymentValue = lead.saleValue; // All paid
+      } else if (saleData) {
+        // Standard won deal
+        updatedLead.saleValue = saleData.value;
+        updatedLead.modality = saleData.modality;
+        updatedLead.paymentMethod = saleData.paymentMethod;
+        updatedLead.assignedToId = saleData.sellerId;
+        updatedLead.classLocation = saleData.classLocation;
+        updatedLead.hasDownPayment = false;
+        updatedLead.remainingBalance = 0;
+
+        addTransaction({
+          type: 'INCOME',
+          amount: saleData.value,
+          description: `Venda Imersão - ${lead.name} (${saleData.classLocation})`,
+          date: new Date().toISOString(),
+          category: 'Vendas',
+          paymentMethod: saleData.paymentMethod
+        });
+      }
     }
 
     updatedLeadFinal = updatedLead;
@@ -341,9 +374,15 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       await supabase.from('lead_history').insert(historyEntry);
 
       if (status === 'GANHO') {
-        showToast("Venda registrada com sucesso! 🚀", "success");
+        if (oldStatus === 'SINAL') {
+          showToast("Matrícula quitada com sucesso! 💎", "success");
+        } else {
+          showToast("Venda registrada com sucesso! 🚀", "success");
+        }
+      } else if (status === 'SINAL') {
+        showToast("Sinal de venda registrado! 💰", "success");
       } else {
-        showToast(`Lead movido para ${status}`, "info");
+        showToast(`Lead movido para ${STATUS_LABELS[status]}`, "info");
       }
     }
   };

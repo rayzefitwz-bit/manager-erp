@@ -29,7 +29,6 @@ export const Commissions = () => {
       const sales = leads.filter(l =>
         l.assignedToId === member.id &&
         l.status === 'GANHO' &&
-        !l.hasDownPayment && // Apenas matrículas completas contam para comissão
         !l.commissionPaymentId &&
         (l.wonAt ? filterBySelectedMonth(l.wonAt) : filterBySelectedMonth(l.createdAt))
       );
@@ -57,8 +56,7 @@ export const Commissions = () => {
     .map(member => {
       const downPayments = leads.filter(l =>
         l.assignedToId === member.id &&
-        l.status === 'GANHO' &&
-        l.hasDownPayment === true &&
+        l.status === 'SINAL' &&
         (l.wonAt ? filterBySelectedMonth(l.wonAt) : filterBySelectedMonth(l.createdAt))
       );
       const count = downPayments.length;
