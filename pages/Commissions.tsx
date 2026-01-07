@@ -3,7 +3,7 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { CommissionReport } from '../types';
-import { Trophy, GraduationCap, Calendar, Filter } from 'lucide-react';
+import { Trophy, GraduationCap, Calendar, Filter, DollarSign } from 'lucide-react';
 import { useState } from 'react';
 
 export const Commissions = () => {
@@ -29,6 +29,7 @@ export const Commissions = () => {
       const sales = leads.filter(l =>
         l.assignedToId === member.id &&
         l.status === 'GANHO' &&
+        !l.hasDownPayment && // Apenas matrículas completas contam para comissão
         !l.commissionPaymentId &&
         filterBySelectedMonth(l.createdAt)
       );
@@ -49,6 +50,33 @@ export const Commissions = () => {
     })
     .filter(r => isAdmin || r.memberId === user?.id)
     .sort((a, b) => b.volume - a.volume);
+
+  // DOWN PAYMENTS Report (Informational only - no commission)
+  const downPaymentReports = team
+    .filter(t => t.role === 'VENDEDOR')
+    .map(member => {
+      const downPayments = leads.filter(l =>
+        l.assignedToId === member.id &&
+        l.status === 'GANHO' &&
+        l.hasDownPayment === true &&
+        filterBySelectedMonth(l.createdAt)
+      );
+      const count = downPayments.length;
+      const totalValue = downPayments.reduce((acc, curr) => acc + (curr.saleValue || 0), 0);
+      const totalDownPaymentValue = downPayments.reduce((acc, curr) => acc + (curr.downPaymentValue || 0), 0);
+      const totalRemaining = downPayments.reduce((acc, curr) => acc + (curr.remainingBalance || 0), 0);
+
+      return {
+        memberId: member.id,
+        name: member.name,
+        count,
+        totalValue,
+        totalDownPaymentValue,
+        totalRemaining
+      };
+    })
+    .filter(r => r.count > 0) // Apenas vendedores com sinais
+    .sort((a, b) => b.count - a.count);
 
   // TEACHERS Report (Filtered by selected month)
   const teacherReports = team
@@ -126,7 +154,7 @@ export const Commissions = () => {
         <div className="p-6 border-b flex justify-between items-center">
           <div>
             <h3 className="font-bold text-gray-800">Desempenho Vendedores</h3>
-            <p className="text-sm text-gray-400 mt-1">Regra: Até 25 matrículas (5%), Acima de 26 (10%)</p>
+            <p className="text-sm text-gray-400 mt-1">Regra: Até 25 matrículas (5%), Acima de 26 (10%) - Apenas Matrículas Completas</p>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -170,6 +198,47 @@ export const Commissions = () => {
           </table>
         </div>
       </div>
+
+      {/* Sinais de Matrícula - Informativo */}
+      {isAdmin && downPaymentReports.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+          <div className="p-6 border-b bg-amber-50">
+            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-amber-600" />
+              Sinais de Matrícula por Vendedor
+            </h3>
+            <p className="text-sm text-amber-700 mt-1 font-bold">📊 Informativo - Sem Comissão (Pagamentos Parciais)</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-amber-50 text-gray-600 text-sm">
+                <tr>
+                  <th className="p-4">Vendedor</th>
+                  <th className="p-4 text-center">Quantidade</th>
+                  <th className="p-4 text-right">Valor Total</th>
+                  <th className="p-4 text-right">Total em Sinais</th>
+                  <th className="p-4 text-right">Saldo a Receber</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {downPaymentReports.map(report => (
+                  <tr key={report.memberId} className="hover:bg-amber-50">
+                    <td className="p-4 font-medium text-gray-800">{report.name}</td>
+                    <td className="p-4 text-center">
+                      <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded-full text-xs font-bold">
+                        {report.count}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right text-gray-600 font-medium">R$ {report.totalValue.toLocaleString()}</td>
+                    <td className="p-4 text-right text-amber-600 font-bold">R$ {report.totalDownPaymentValue.toLocaleString()}</td>
+                    <td className="p-4 text-right text-red-600 font-bold">R$ {report.totalRemaining.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Professores - Somente Admin */}
       {isAdmin && (

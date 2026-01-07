@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Users, MessageSquare, Briefcase, TrendingUp, UserCheck } from 'lucide-react';
+import { Users, MessageSquare, Briefcase, TrendingUp, UserCheck, DollarSign } from 'lucide-react';
 import { STATUS_LABELS } from '../constants';
 
 const StatCard = ({ title, value, icon: Icon, color }: any) => (
@@ -23,7 +23,8 @@ export const SalesAnalysis = () => {
   // Métricas Gerais
   const totalContacted = leads.filter(l => l.status === 'LIGACAO' || l.status === 'WHATSAPP').length;
   const totalNegotiating = leads.filter(l => l.status === 'NEGOCIANDO').length;
-  const totalWon = leads.filter(l => l.status === 'GANHO').length;
+  const totalWon = leads.filter(l => l.status === 'GANHO' && !l.hasDownPayment).length;
+  const totalDownPayments = leads.filter(l => l.status === 'GANHO' && l.hasDownPayment).length;
   const totalLeads = leads.length;
 
   // Breakdown por Vendedor
@@ -34,7 +35,8 @@ export const SalesAnalysis = () => {
       name: seller.name,
       contacted: sellerLeads.filter(l => l.status === 'LIGACAO' || l.status === 'WHATSAPP').length,
       negotiating: sellerLeads.filter(l => l.status === 'NEGOCIANDO').length,
-      won: sellerLeads.filter(l => l.status === 'GANHO').length,
+      won: sellerLeads.filter(l => l.status === 'GANHO' && !l.hasDownPayment).length,
+      downPayments: sellerLeads.filter(l => l.status === 'GANHO' && l.hasDownPayment).length,
       total: sellerLeads.length
     };
   }).sort((a, b) => (b.contacted + b.negotiating) - (a.contacted + a.negotiating));
@@ -49,7 +51,7 @@ export const SalesAnalysis = () => {
       </div>
 
       {/* Resumo Geral */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <StatCard
           title="Geral: Contatados"
           value={totalContacted}
@@ -63,7 +65,13 @@ export const SalesAnalysis = () => {
           color="bg-purple-600"
         />
         <StatCard
-          title="Geral: Matrículas"
+          title="Sinais de Matrícula"
+          value={totalDownPayments}
+          icon={DollarSign}
+          color="bg-amber-500"
+        />
+        <StatCard
+          title="Matrículas Completas"
           value={totalWon}
           icon={UserCheck}
           color="bg-green-600"
@@ -92,9 +100,10 @@ export const SalesAnalysis = () => {
                 <th className="p-4">Vendedor</th>
                 <th className="p-4 text-center">Status: Contatado</th>
                 <th className="p-4 text-center">Status: Negociando</th>
-                <th className="p-4 text-center">Vendas Ganhas</th>
+                <th className="p-4 text-center">Sinais</th>
+                <th className="p-4 text-center">Matrículas</th>
                 <th className="p-4 text-center">Total de Leads</th>
-                <th className="p-4 text-right">Eficiência (Ganhas/Total)</th>
+                <th className="p-4 text-right">Eficiência (Matrículas/Total)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -123,6 +132,11 @@ export const SalesAnalysis = () => {
                   <td className="p-4 text-center">
                     <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 font-bold text-sm">
                       {perf.negotiating}
+                    </span>
+                  </td>
+                  <td className="p-4 text-center">
+                    <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-bold text-sm">
+                      {perf.downPayments}
                     </span>
                   </td>
                   <td className="p-4 text-center">

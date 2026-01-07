@@ -14,17 +14,41 @@ const WonDealModal = ({ isOpen, onClose, onSubmit, team, immersiveClasses }: any
   const [classLocation, setClassLocation] = useState(immersiveClasses[0]?.city || 'Curitiba');
   const [payment, setPayment] = useState('PIX');
   const [sellerId, setSellerId] = useState('');
+  const [hasDownPayment, setHasDownPayment] = useState(false);
+  const [downPaymentValue, setDownPaymentValue] = useState('');
 
   if (!isOpen) return null;
 
+  const totalValue = Number(value) || 0;
+  const downValue = Number(downPaymentValue) || 0;
+  const remainingBalance = hasDownPayment ? totalValue - downValue : 0;
+
+  const handleSubmit = () => {
+    const data: any = {
+      value: totalValue,
+      modality,
+      paymentMethod: payment,
+      sellerId,
+      classLocation
+    };
+
+    if (hasDownPayment) {
+      data.hasDownPayment = true;
+      data.downPaymentValue = downValue;
+      data.remainingBalance = remainingBalance;
+    }
+
+    onSubmit(data);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-96">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-96 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-bold mb-4">Registrar Venda</h3>
 
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Valor da Venda (R$)</label>
+            <label className="block text-sm font-medium text-gray-700">Valor Total da Venda (R$) <span className="text-red-500">*</span></label>
             <input
               type="number"
               className="w-full border p-2 rounded"
@@ -33,6 +57,46 @@ const WonDealModal = ({ isOpen, onClose, onSubmit, team, immersiveClasses }: any
               placeholder="0.00"
             />
           </div>
+
+          {/* Botão de Sinal de Entrada */}
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                setHasDownPayment(!hasDownPayment);
+                if (hasDownPayment) setDownPaymentValue('');
+              }}
+              className={`w-full py-2.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${hasDownPayment
+                ? 'bg-amber-100 text-amber-700 border-2 border-amber-400'
+                : 'bg-gray-100 text-gray-600 border-2 border-gray-300 hover:bg-gray-200'
+                }`}
+            >
+              {hasDownPayment ? '✓ ' : ''}Aluno deu um sinal de entrada
+            </button>
+          </div>
+
+          {/* Campo de Sinal - Condicional */}
+          {hasDownPayment && (
+            <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 space-y-2 animate-fade-in">
+              <div>
+                <label className="block text-xs font-bold text-amber-800 mb-1">Valor do Sinal (R$)</label>
+                <input
+                  type="number"
+                  className="w-full border border-amber-300 p-2 rounded text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+                  value={downPaymentValue}
+                  onChange={e => setDownPaymentValue(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              {downValue > 0 && totalValue > 0 && (
+                <div className="text-xs bg-white p-2 rounded border border-amber-200">
+                  <span className="text-gray-600">Saldo Restante: </span>
+                  <span className="font-bold text-amber-700">R$ {remainingBalance.toLocaleString()}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700">Vendedor</label>
             <select
@@ -76,9 +140,9 @@ const WonDealModal = ({ isOpen, onClose, onSubmit, team, immersiveClasses }: any
         <div className="flex justify-end gap-2 mt-6">
           <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancelar</button>
           <button
-            onClick={() => onSubmit({ value: Number(value), modality, paymentMethod: payment, sellerId, classLocation })}
+            onClick={handleSubmit}
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            disabled={!value || !sellerId}
+            disabled={!value || !sellerId || (hasDownPayment && (!downPaymentValue || downValue >= totalValue))}
           >
             Confirmar Venda
           </button>
@@ -1000,13 +1064,17 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                   {columnLeads.map(lead => {
                     const assignedTo = team.find(t => t.id === lead.assignedToId);
                     const isSelected = selectedLeads.includes(lead.id);
+                    const hasDownPayment = lead.hasDownPayment || false;
 
                     return (
                       <div
                         key={lead.id}
                         draggable={selectedLeads.length === 0}
                         onDragStart={(e) => onDragStart(e, lead.id)}
-                        className={`bg-white p-4 rounded-lg shadow-sm border-2 transition-all cursor-grab active:cursor-grabbing relative ${draggedLeadId === lead.id ? 'opacity-50' : 'opacity-100'} ${isSelected ? 'border-blue-500 bg-blue-50 shadow-md scale-[0.98]' : 'border-transparent hover:shadow-md'}`}
+                        className={`p-4 rounded-lg shadow-sm border-2 transition-all cursor-grab active:cursor-grabbing relative ${hasDownPayment
+                            ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300'
+                            : 'bg-white'
+                          } ${draggedLeadId === lead.id ? 'opacity-50' : 'opacity-100'} ${isSelected ? 'border-blue-500 bg-blue-50 shadow-md scale-[0.98]' : hasDownPayment ? 'border-amber-300 hover:shadow-md' : 'border-transparent hover:shadow-md'}`}
                       >
                         {isAdmin && (
                           <button
@@ -1015,6 +1083,13 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                           >
                             {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                           </button>
+                        )}
+
+                        {/* Badge de Sinal Pendente */}
+                        {hasDownPayment && (
+                          <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-bold px-2 py-1 rounded-full shadow-md z-10 flex items-center gap-1">
+                            <span>⚠</span> Sinal Pendente
+                          </div>
                         )}
 
                         <div className="flex justify-between items-start mb-2">
@@ -1073,11 +1148,30 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                             <MessageCircle className="w-3 h-3" /> WhatsApp
                           </a>
                         </div>
+
+                        {/* Exibição de Valores - Diferente para sinal vs pagamento completo */}
                         {lead.saleValue && (
-                          <div className="mt-3 pt-3 border-t text-[10px] text-gray-500 flex flex-col gap-1">
-                            <div className="flex justify-between items-center">
-                              <span className="font-bold text-green-600 text-sm">R$ {lead.saleValue.toLocaleString()}</span>
-                            </div>
+                          <div className={`mt-3 pt-3 border-t text-[10px] flex flex-col gap-1.5 ${hasDownPayment ? 'border-amber-200' : 'border-gray-200'}`}>
+                            {hasDownPayment ? (
+                              <>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-amber-700 font-medium">Valor Total:</span>
+                                  <span className="font-bold text-gray-800">R$ {lead.saleValue.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-amber-100 px-2 py-1 rounded">
+                                  <span className="text-amber-800 font-bold">Sinal Pago:</span>
+                                  <span className="font-bold text-amber-900">R$ {(lead.downPaymentValue || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-white px-2 py-1 rounded border border-amber-200">
+                                  <span className="text-red-700 font-bold">Saldo Restante:</span>
+                                  <span className="font-black text-red-600">R$ {(lead.remainingBalance || 0).toLocaleString()}</span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold text-green-600 text-sm">R$ {lead.saleValue.toLocaleString()}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

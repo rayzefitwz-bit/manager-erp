@@ -22,6 +22,9 @@ export interface Lead {
   observation?: string;
   commissionPaymentId?: string;
   updatedAt: string;
+  hasDownPayment?: boolean; // Indica se tem apenas sinal de entrada
+  downPaymentValue?: number; // Valor do sinal pago
+  remainingBalance?: number; // Saldo restante a ser pago
 }
 
 export interface LeadHistoryEntry {
