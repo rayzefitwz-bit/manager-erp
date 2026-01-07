@@ -1244,7 +1244,7 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
           <button
             onClick={handleSyncClick}
             disabled={isSyncing}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-all text-sm font-bold ${lastSyncConfig ? 'bg-indigo-600 text-white hover:bg-indigo-700' : (isAdmin ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300' : 'hidden')}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-all text-sm font-bold ${lastSyncConfig ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'}`}
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Sincronizando...' : (lastSyncConfig ? 'Sincronizar' : 'Configurar Sync')}
