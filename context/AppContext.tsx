@@ -145,6 +145,24 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     };
 
     initData();
+
+    // Realtime Subscriptions
+    const leadsSubscription = supabase
+      .channel('public:leads')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setLeads(prev => [payload.new as Lead, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setLeads(prev => prev.map(l => l.id === payload.new.id ? payload.new as Lead : l));
+        } else if (payload.eventType === 'DELETE') {
+          setLeads(prev => prev.filter(l => l.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(leadsSubscription);
+    };
   }, []);
 
   // --- Sistema de Realocação Automática (72h) ---
