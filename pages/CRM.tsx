@@ -1078,8 +1078,10 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
   const handleSyncClick = () => {
     if (lastSyncConfig) {
       handleSync(lastSyncConfig.url, { type: lastSyncConfig.assignmentType || 'SINGLE', sellerId: lastSyncConfig.sellerId });
-    } else {
+    } else if (isAdmin) {
       setIsSyncConfigModalOpen(true);
+    } else {
+      showToast("Sincronização não configurada pelo administrador.", "info");
     }
   };
 
