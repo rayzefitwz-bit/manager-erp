@@ -47,6 +47,7 @@ export interface Transaction {
   date: string;
   category?: string;
   classLocation?: string; // Turma associada ao lançamento (especialmente para leads)
+  paymentMethod?: string;
 }
 
 export interface TeamMember {

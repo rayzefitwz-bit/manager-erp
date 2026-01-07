@@ -1,11 +1,13 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { LeadStatus, Lead, Modality, ImmersiveClass } from '../types';
 import { STATUS_LABELS, STATUS_COLORS } from '../constants';
-import { MessageCircle, FileUp, MoreHorizontal, Plus, Users, Shuffle, UserCheck, Link, Globe, RefreshCw, Calendar, Target, UserPlus, CheckSquare, Square, XCircle, Trash2 } from 'lucide-react';
+import { MessageCircle, FileUp, MoreHorizontal, Plus, Users, Shuffle, UserCheck, Link, Globe, RefreshCw, Calendar, Target, UserPlus, CheckSquare, Square, XCircle, Trash2, DollarSign, CheckCircle } from 'lucide-react';
 import { read, utils } from 'xlsx';
+import confetti from 'canvas-confetti';
+
 
 // Modal for Won Deal
 const WonDealModal = ({ isOpen, onClose, onSubmit, team, immersiveClasses }: any) => {
@@ -634,24 +636,116 @@ const SyncConfigModal = ({ isOpen, onClose, onConfirm, team }: any) => {
   );
 };
 
+// Modal for settling down payment
+const SettlePaymentModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
+  const [amount, setAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [observation, setObservation] = useState('');
+
+  useEffect(() => {
+    if (isOpen && lead) {
+      setAmount(lead.remainingBalance ? String(lead.remainingBalance) : '');
+      setPaymentMethod('');
+      setObservation('');
+    }
+  }, [isOpen, lead]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (amount && paymentMethod) {
+      onSubmit({ amount: parseFloat(amount), paymentMethod, observation });
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-[450px] animate-fade-in">
+        <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+          <DollarSign className="w-5 h-5 text-green-600" />
+          Receber Pagamento Restante
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Registre o pagamento restante para o lead: <span className="font-bold text-gray-700">{lead?.name}</span>
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Valor (R$)</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="w-full border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none"
+              placeholder="0.00"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Método de Pagamento</label>
+            <select
+              value={paymentMethod}
+              onChange={e => setPaymentMethod(e.target.value)}
+              className="w-full border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none"
+              required
+            >
+              <option value="">Selecione...</option>
+              <option value="PIX">PIX</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Boleto">Boleto</option>
+              <option value="Transferência">Transferência Bancária</option>
+              <option value="Dinheiro">Dinheiro</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Observação (Opcional)</label>
+            <textarea
+              value={observation}
+              onChange={e => setObservation(e.target.value)}
+              className="w-full border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none"
+              rows={3}
+            ></textarea>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-6">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-bold shadow-md"
+              disabled={!amount || !paymentMethod}
+            >
+              Confirmar Pagamento
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export const CRM = () => {
-  const { leads, updateLeadStatus, reassignLeads, importLeads, deleteLeads, team, addLead, lastSyncConfig, immersiveClasses } = useApp();
+  const { leads, team, isLoading, updateLeadStatus, addLead, reassignLeads, importLeads, deleteLeads, clearLeads, lastSyncConfig, settleDownPayment, immersiveClasses } = useApp();
   const { user } = useAuth();
 
+  // States
   const [isWonModalOpen, setIsWonModalOpen] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
+  const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
+  const [pendingLeadId, setPendingLeadId] = useState<string | null>(null);
+  const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null);
+  const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
+  const [isSyncConfigModalOpen, setIsSyncConfigModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isSyncConfigModalOpen, setIsSyncConfigModalOpen] = useState(false);
-  const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
-  const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
-  const [isSyncing, setIsSyncing] = useState(false);
+  // Settle States
+  const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
+  const [leadToSettle, setLeadToSettle] = useState<Lead | null>(null);
 
-  // State for handling transitions with observation
-  const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null);
-  const [pendingLeadId, setPendingLeadId] = useState<string | null>(null);
   const [storedObservation, setStoredObservation] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -663,8 +757,6 @@ export const CRM = () => {
   const [newLeadName, setNewLeadName] = useState('');
   const [newLeadPhone, setNewLeadPhone] = useState('');
   const [newLeadRole, setNewLeadRole] = useState('');
-
-  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
 
   const isAdmin = user?.role === 'ADMIN';
 
@@ -815,6 +907,28 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
       setIsWonModalOpen(false);
       setActiveLeadId(null);
       setStoredObservation(null);
+    }
+  };
+
+  const handleSettleClick = (lead: Lead) => {
+    setLeadToSettle(lead);
+    setIsSettleModalOpen(true);
+  };
+
+  const handleSettleSubmit = async (data: { amount: number, paymentMethod: string, observation: string }) => {
+    if (leadToSettle) {
+      await settleDownPayment(leadToSettle.id, data.amount, data.paymentMethod, data.observation);
+
+      // Trigger Confetti
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff']
+      });
+
+      setIsSettleModalOpen(false);
+      setLeadToSettle(null);
     }
   };
 
@@ -1072,8 +1186,8 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                         draggable={selectedLeads.length === 0}
                         onDragStart={(e) => onDragStart(e, lead.id)}
                         className={`p-4 rounded-lg shadow-sm border-2 transition-all cursor-grab active:cursor-grabbing relative ${hasDownPayment
-                            ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300'
-                            : 'bg-white'
+                          ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300'
+                          : 'bg-white'
                           } ${draggedLeadId === lead.id ? 'opacity-50' : 'opacity-100'} ${isSelected ? 'border-blue-500 bg-blue-50 shadow-md scale-[0.98]' : hasDownPayment ? 'border-amber-300 hover:shadow-md' : 'border-transparent hover:shadow-md'}`}
                       >
                         {isAdmin && (
@@ -1166,6 +1280,13 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                                   <span className="text-red-700 font-bold">Saldo Restante:</span>
                                   <span className="font-black text-red-600">R$ {(lead.remainingBalance || 0).toLocaleString()}</span>
                                 </div>
+                                <button
+                                  onClick={() => handleSettleClick(lead)}
+                                  className="mt-1 w-full flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-2 py-1.5 rounded font-bold text-[10px] shadow-sm transition-all transform active:scale-95"
+                                >
+                                  <DollarSign className="w-3 h-3" />
+                                  Receber Restante (R$ {(lead.remainingBalance || 0).toLocaleString()})
+                                </button>
                               </>
                             ) : (
                               <div className="flex justify-between items-center">
@@ -1184,7 +1305,21 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
         </div>
       </div>
 
-      <WonDealModal isOpen={isWonModalOpen} onClose={() => setIsWonModalOpen(false)} onSubmit={handleWonSubmit} team={team} immersiveClasses={immersiveClasses} />
+      <WonDealModal
+        isOpen={isWonModalOpen}
+        onClose={() => setIsWonModalOpen(false)}
+        onSubmit={handleWonSubmit}
+        team={team}
+        immersiveClasses={immersiveClasses}
+      />
+
+      <SettlePaymentModal
+        isOpen={isSettleModalOpen}
+        onClose={() => setIsSettleModalOpen(false)}
+        onSubmit={handleSettleSubmit}
+        lead={leadToSettle}
+      />
+
       <ImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleImport} team={team} immersiveClasses={immersiveClasses} />
       <ObservationModal isOpen={isObservationModalOpen} onClose={() => setIsObservationModalOpen(false)} onSubmit={handleObservationSubmit} />
       <ReassignModal

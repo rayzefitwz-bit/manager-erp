@@ -42,6 +42,7 @@ interface AppContextType {
   addClass: (cls: Omit<ImmersiveClass, 'id'>) => void;
   updateClass: (id: string, cls: Omit<ImmersiveClass, 'id'>) => void;
   removeClass: (id: string) => void;
+  settleDownPayment: (leadId: string, amount: number, paymentMethod: string, observation?: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -304,6 +305,59 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       setLeadHistory(prev => [historyEntry, ...prev]);
       await supabase.from('lead_history').insert(historyEntry);
     }
+  }
+  const settleDownPayment = async (leadId: string, amount: number, paymentMethod: string, observation?: string) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return;
+
+    const notes = observation || `[Sistema] Matrícula quitada. Sinal anterior: R$ ${(lead.downPaymentValue || 0).toLocaleString()} + Pagamento Final: R$ ${amount.toLocaleString()}`;
+
+    // 1. Add Transaction for the remaining amount
+    await addTransaction({
+      type: 'INCOME',
+      amount: amount,
+      description: `Quit. Matrícula - ${lead.name} (${lead.classLocation})`,
+      date: new Date().toISOString(),
+      category: 'Vendas',
+      paymentMethod: paymentMethod
+    });
+
+    // 2. Update Lead to remove down payment flags (converting to full enrollment)
+    const updatedLead = {
+      ...lead,
+      hasDownPayment: false,
+      downPaymentValue: undefined,
+      remainingBalance: undefined, // Cleared
+      updatedAt: new Date().toISOString(),
+      observation: (lead.observation || '') + '\n' + notes
+    };
+
+    setLeads(prev => prev.map(l => l.id === leadId ? updatedLead : l));
+
+    // 3. Persist to DB
+    // We explicitly set them to null/false in DB
+    await supabase.from('leads').update({
+      hasDownPayment: false,
+      downPaymentValue: null,
+      remainingBalance: null,
+      updatedAt: new Date().toISOString(),
+      observation: updatedLead.observation
+    }).eq('id', leadId);
+
+    // 4. Record History
+    const historyEntry: LeadHistoryEntry = {
+      id: crypto.randomUUID(),
+      leadId,
+      leadName: lead.name,
+      oldStatus: 'GANHO',
+      newStatus: 'GANHO',
+      observation: `Matrícula Completada: ${notes}`,
+      changedById: '00000000-0000-0000-0000-000000000000',
+      changedByName: 'Sistema',
+      createdAt: new Date().toISOString()
+    };
+    setLeadHistory(prev => [historyEntry, ...prev]);
+    await supabase.from('lead_history').insert(historyEntry);
   };
 
   const reassignLeads = async (leadIds: string[], sellerId: string) => {
@@ -574,7 +628,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         addLead, updateLeadStatus, reassignLeads, importLeads, deleteLeads, clearLeads, addTransaction, payCommission,
         addSupplier, removeSupplier, syncSuppliers,
         addTeamMember, removeTeamMember, getSalesBySeller, addKnowledgeItem, removeKnowledgeItem,
-        syncKnowledgeItem, addClass, updateClass, removeClass
+        syncKnowledgeItem, addClass, updateClass, removeClass, settleDownPayment
       }}
     >
       {children}
