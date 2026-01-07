@@ -23,7 +23,7 @@ interface AppContextType {
   lastSyncConfig: SyncConfig | null;
   isLoading: boolean;
   addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'status' | 'updatedAt'>) => void;
-  updateLeadStatus: (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string }, observation?: string, changedBy?: { id: string; name: string }) => void;
+  updateLeadStatus: (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string; hasDownPayment?: boolean; downPaymentValue?: number; remainingBalance?: number }, observation?: string, changedBy?: { id: string; name: string }) => void;
   reassignLeads: (leadIds: string[], sellerId: string) => void;
   importLeads: (leadsData: Array<{ name: string; phone: string; role?: string; classLocation?: string; createdAt?: string }>, totalImportCost: number, assignmentConfig?: { type: 'SINGLE' | 'EQUAL', sellerId?: string }, sheetsUrl?: string, investmentClassLocation?: string) => void;
   deleteLeads: (leadIds: string[]) => void;
@@ -237,7 +237,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     await supabase.from('transactions').insert(newTransaction);
   };
 
-  const updateLeadStatus = async (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string }, observation?: string, changedBy?: { id: string; name: string }) => {
+  const updateLeadStatus = async (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string; hasDownPayment?: boolean; downPaymentValue?: number; remainingBalance?: number }, observation?: string, changedBy?: { id: string; name: string }) => {
     let updatedLeadFinal: Lead | null = null;
     let oldStatus: LeadStatus | undefined;
 
@@ -258,10 +258,24 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
           updatedLead.paymentMethod = saleData.paymentMethod;
           updatedLead.assignedToId = saleData.sellerId;
           updatedLead.classLocation = saleData.classLocation;
+
+          // Down Payment Logic
+          if (saleData.hasDownPayment) {
+            updatedLead.hasDownPayment = true;
+            updatedLead.downPaymentValue = saleData.downPaymentValue;
+            updatedLead.remainingBalance = saleData.remainingBalance;
+          } else {
+            updatedLead.hasDownPayment = false;
+            updatedLead.downPaymentValue = undefined;
+            updatedLead.remainingBalance = undefined;
+          }
+
           addTransaction({
             type: 'INCOME',
-            amount: saleData.value,
-            description: `Venda Imersão - ${lead.name} (${saleData.classLocation})`,
+            amount: saleData.hasDownPayment ? (saleData.downPaymentValue || 0) : saleData.value, // Registra apenas o que foi pago
+            description: saleData.hasDownPayment
+              ? `Sinal Imersão - ${lead.name} (${saleData.classLocation})`
+              : `Venda Imersão - ${lead.name} (${saleData.classLocation})`,
             date: new Date().toISOString(),
             category: 'Vendas',
           });
