@@ -86,6 +86,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         const { data: dbKnowledge } = await supabase.from('knowledge_items').select('*');
         const { data: dbHistory } = await supabase.from('lead_history').select('*');
 
+        // Fetch shared sync config from settings table
+        const { data: dbSettings } = await supabase.from('settings').select('*').eq('id', 'sync_config').single();
+
         if (dbLeads) setLeads(dbLeads);
         else {
           const saved = localStorage.getItem('leads');
@@ -139,8 +142,12 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         const savedSuppliersUrl = localStorage.getItem('suppliersSyncUrl');
         if (savedSuppliersUrl) setSuppliersSyncUrl(savedSuppliersUrl);
 
-        const savedSync = localStorage.getItem('lastSyncConfig');
-        if (savedSync) setLastSyncConfig(JSON.parse(savedSync));
+        if (dbSettings && dbSettings.value) {
+          setLastSyncConfig(dbSettings.value);
+        } else {
+          const savedSync = localStorage.getItem('lastSyncConfig');
+          if (savedSync) setLastSyncConfig(JSON.parse(savedSync));
+        }
 
       } catch (error) {
         console.error("Erro ao sincronizar com Supabase:", error);
@@ -519,11 +526,13 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     await supabase.from('leads').insert(newLeads);
 
     if (sheetsUrl && assignmentConfig) {
-      setLastSyncConfig({
+      const config: SyncConfig = {
         url: sheetsUrl,
         sellerId: assignmentConfig.sellerId,
         assignmentType: assignmentConfig.type
-      });
+      };
+      setLastSyncConfig(config);
+      await supabase.from('settings').upsert({ id: 'sync_config', value: config });
     }
 
     if (totalImportCost > 0) {

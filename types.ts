@@ -1,7 +1,7 @@
 
 export type UserRole = 'ADMIN' | 'VENDEDOR' | 'PROFESSOR';
 
-export type LeadStatus = 'NOVO' | 'LIGACAO' | 'WHATSAPP' | 'SEM_RESPOSTA' | 'NEGOCIANDO' | 'SINAL' | 'GANHO';
+export type LeadStatus = 'NOVO' | 'LIGACAO' | 'WHATSAPP' | 'SEM_RESPOSTA' | 'NEGOCIANDO' | 'SINAL' | 'GANHO' | 'NAO_INTERESSADO';
 
 export type Modality = 'ONLINE' | 'PRESENCIAL' | null;
 

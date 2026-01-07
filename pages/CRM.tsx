@@ -846,7 +846,7 @@ export const CRM = () => {
 
   const isAdmin = user?.role === 'ADMIN';
 
-  const statuses: LeadStatus[] = ['NOVO', 'LIGACAO', 'WHATSAPP', 'SEM_RESPOSTA', 'NEGOCIANDO', 'SINAL', 'GANHO'];
+  const statuses: LeadStatus[] = ['NOVO', 'LIGACAO', 'WHATSAPP', 'SEM_RESPOSTA', 'NEGOCIANDO', 'SINAL', 'GANHO', 'NAO_INTERESSADO'];
 
   // Filter leads logic
   const filteredLeads = leads.filter(lead => {
@@ -855,12 +855,20 @@ export const CRM = () => {
       return false;
     }
 
-    // 7-day rule for lost leads
+    // 7-day rule for lost leads (SEM_RESPOSTA)
     if (lead.status === 'SEM_RESPOSTA' && lead.lostAt) {
       const lostDate = new Date(lead.lostAt);
       const diffTime = Math.abs(new Date().getTime() - lostDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays > 7) return false;
+    }
+
+    // 3-day rule for "Não tem interesse" leads for VENDEDOR
+    if (lead.status === 'NAO_INTERESSADO' && !isAdmin) {
+      const updatedAt = new Date(lead.updatedAt);
+      const diffTime = Math.abs(new Date().getTime() - updatedAt.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 3) return false;
     }
 
     // Search filter
@@ -902,7 +910,8 @@ export const CRM = () => {
       'SEM_RESPOSTA': 0,
       'NEGOCIANDO': 0,
       'SINAL': 0,
-      'GANHO': 0
+      'GANHO': 0,
+      'NAO_INTERESSADO': 0
     };
 
     userLeads.forEach(lead => {
@@ -1102,6 +1111,7 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
         .filter(item => item !== null && item.name !== '' && item.phone !== '') as Array<{ name: string; phone: string; role?: string; classLocation?: string; createdAt?: string }>;
 
       importLeads(parsed, 0, assignmentConfig, url);
+      showToast("Sincronização concluída!", "success");
     } catch (error) {
       alert("Erro na sincronização. Verifique o link e tente novamente.");
     } finally {
@@ -1234,7 +1244,7 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
           <button
             onClick={handleSyncClick}
             disabled={isSyncing}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-all text-sm font-bold ${lastSyncConfig ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-all text-sm font-bold ${lastSyncConfig ? 'bg-indigo-600 text-white hover:bg-indigo-700' : (isAdmin ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300' : 'hidden')}`}
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Sincronizando...' : (lastSyncConfig ? 'Sincronizar' : 'Configurar Sync')}
