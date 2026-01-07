@@ -783,7 +783,7 @@ const SettlePaymentModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
 };
 
 export const CRM = () => {
-  const { leads, team, isLoading, updateLeadStatus, addLead, reassignLeads, importLeads, deleteLeads, clearLeads, lastSyncConfig, settleDownPayment, immersiveClasses } = useApp();
+  const { leads, team, isLoading, updateLeadStatus, addLead, reassignLeads, importLeads, deleteLeads, clearLeads, lastSyncConfig, settleDownPayment, immersiveClasses, showToast } = useApp();
   const { user } = useAuth();
 
   // States
