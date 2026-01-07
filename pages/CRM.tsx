@@ -1273,7 +1273,7 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                         key={lead.id}
                         draggable={selectedLeads.length === 0}
                         onDragStart={(e) => onDragStart(e, lead.id)}
-                        className={`p-4 rounded-lg shadow-sm border-2 transition-all cursor-grab active:cursor-grabbing relative ${hasDownPayment
+                        className={`p-4 rounded-lg shadow-sm border-2 transition-all cursor-grab active:cursor-grabbing relative group ${hasDownPayment
                           ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300'
                           : 'bg-white'
                           } ${draggedLeadId === lead.id ? 'opacity-50' : 'opacity-100'} ${isSelected ? 'border-blue-500 bg-blue-50 shadow-md scale-[0.98]' : hasDownPayment ? 'border-amber-300 hover:shadow-md' : 'border-transparent hover:shadow-md'}`}
@@ -1294,11 +1294,23 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                           </div>
                         )}
 
+                        {/* Barra de Ações (Fica no Topo e aparece no Hover) */}
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 scale-90 group-hover:scale-100 pointer-events-none group-hover:pointer-events-auto">
+                          <a
+                            href={getWhatsAppLink(lead, isAdmin ? (assignedTo?.name || user?.name) : user?.name)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black shadow-lg flex items-center gap-2 transition-transform hover:scale-110 active:scale-95 whitespace-nowrap"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" /> Falar no WhatsApp
+                          </a>
+                        </div>
+
                         <div className="flex justify-between items-start mb-2">
                           <h4 className="font-bold text-gray-800 text-sm leading-tight">{lead.name}</h4>
-                          <div className="relative group">
+                          <div className="relative group/menu">
                             <button className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"><MoreHorizontal className="w-4 h-4" /></button>
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white border rounded shadow-2xl hidden group-hover:block z-20 py-1.5 animate-fade-in">
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white border rounded shadow-2xl hidden group-hover/menu:block z-30 py-1.5 animate-fade-in">
                               <p className="px-3 py-1 text-[9px] text-gray-400 font-bold uppercase border-b mb-1">Mover Etapa:</p>
                               {statuses.map(s => (
                                 <button key={s} onClick={() => handleStatusChange(lead.id, s)} className="block w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 hover:text-blue-700 transition-colors font-medium">
@@ -1339,17 +1351,6 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                             <UserCheck className="w-3 h-3" /> {assignedTo.name}
                           </div>
                         )}
-
-                        <div className="flex gap-2">
-                          <a
-                            href={getWhatsAppLink(lead, isAdmin ? (assignedTo?.name || user?.name) : user?.name)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 flex items-center justify-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-[11px] font-bold py-1.5 rounded transition-colors shadow-sm"
-                          >
-                            <MessageCircle className="w-3 h-3" /> WhatsApp
-                          </a>
-                        </div>
 
                         {/* Exibição de Valores - Diferente para sinal vs pagamento completo */}
                         {lead.saleValue && (
