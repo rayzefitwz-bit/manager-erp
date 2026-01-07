@@ -45,6 +45,57 @@
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
+      
+      /* Kanban Header Scroll Fix */
+      .kanban-container {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      
+      .kanban-scroll-wrapper {
+        display: flex;
+        flex-direction: column;
+        overflow-x: auto;
+        overflow-y: hidden;
+        transform: rotateX(180deg);
+        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: thin; /* Firefox */
+      }
+      
+      /* Hide scrollbar by default and show on hover */
+      .kanban-scroll-wrapper {
+        scrollbar-color: transparent transparent;
+        transition: scrollbar-color 0.3s;
+      }
+      
+      .kanban-scroll-wrapper:hover {
+        scrollbar-color: #cbd5e1 transparent;
+      }
+      
+      .kanban-scroll-wrapper::-webkit-scrollbar {
+        height: 8px;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      
+      .kanban-scroll-wrapper:hover::-webkit-scrollbar {
+        opacity: 1;
+      }
+      
+      .kanban-scroll-wrapper::-webkit-scrollbar-thumb {
+        background: transparent;
+        border-radius: 10px;
+        transition: background 0.3s;
+      }
+      
+      .kanban-scroll-wrapper:hover::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+      }
+
+      .kanban-scroll-content {
+        transform: rotateX(180deg);
+      }
     </style>
   <script type="importmap">
 {

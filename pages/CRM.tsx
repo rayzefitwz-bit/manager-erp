@@ -801,6 +801,33 @@ export const CRM = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
+  // Board Drag to Scroll States
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isDraggingBoard, setIsDraggingBoard] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Só inicia drag se clicar no fundo do container (não em cards ou botões)
+    if (e.target !== e.currentTarget && !(e.target as HTMLElement).classList.contains('kanban-scroll-content')) return;
+
+    setIsDraggingBoard(true);
+    setStartX(e.pageX - (scrollContainerRef.current?.offsetLeft || 0));
+    setScrollLeft(scrollContainerRef.current?.scrollLeft || 0);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingBoard || !scrollContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollContainerRef.current.offsetLeft;
+    const walk = (x - startX) * 2; // Velocidade de scroll
+    scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleMouseUp = () => {
+    setIsDraggingBoard(false);
+  };
+
   // Settle States
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [leadToSettle, setLeadToSettle] = useState<Lead | null>(null);
@@ -1241,152 +1268,161 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
         </form>
       )}
 
-      <div className="flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="flex gap-4 min-w-[1200px] h-full pb-4">
-          {statuses.map(status => {
-            const columnLeads = filteredLeads
-              .filter(l => l.status === status)
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      <div className="flex-1 kanban-container min-h-0">
+        <div
+          ref={scrollContainerRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={`kanban-scroll-wrapper h-full pb-4 scroll-smooth ${isDraggingBoard ? 'cursor-grabbing select-none' : 'cursor-default'}`}
+        >
+          <div className="kanban-scroll-content flex gap-4 min-w-[1200px] h-full pointer-events-none *:pointer-events-auto">
+            {statuses.map(status => {
+              const columnLeads = filteredLeads
+                .filter(l => l.status === status)
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-            return (
-              <div
-                key={status}
-                className="flex-1 min-w-[280px] flex flex-col bg-gray-100 rounded-xl max-h-full transition-colors border border-transparent hover:border-gray-300"
-                onDragOver={onDragOver}
-                onDrop={(e) => onDrop(e, status)}
-              >
-                <div className={`p-3 border-b-2 font-semibold text-sm uppercase tracking-wide flex justify-between items-center ${STATUS_COLORS[status].split(' ')[2].replace('border', 'border-b')}`}>
-                  {STATUS_LABELS[status]}
-                  <span className="bg-white px-2 py-0.5 rounded-full text-[10px] text-gray-500 shadow-sm border font-bold">
-                    {columnLeads.length}
-                  </span>
-                </div>
+              return (
+                <div
+                  key={status}
+                  className="flex-1 min-w-[280px] flex flex-col bg-gray-100 rounded-xl max-h-full transition-colors border border-transparent hover:border-gray-300"
+                  onDragOver={onDragOver}
+                  onDrop={(e) => onDrop(e, status)}
+                >
+                  <div className={`p-3 border-b-2 font-semibold text-sm uppercase tracking-wide flex justify-between items-center ${STATUS_COLORS[status].split(' ')[2].replace('border', 'border-b')}`}>
+                    {STATUS_LABELS[status]}
+                    <span className="bg-white px-2 py-0.5 rounded-full text-[10px] text-gray-500 shadow-sm border font-bold">
+                      {columnLeads.length}
+                    </span>
+                  </div>
 
-                <div className="p-2 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
-                  {columnLeads.map(lead => {
-                    const assignedTo = team.find(t => t.id === lead.assignedToId);
-                    const isSelected = selectedLeads.includes(lead.id);
-                    const hasDownPayment = lead.hasDownPayment || false;
+                  <div className="p-2 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                    {columnLeads.map(lead => {
+                      const assignedTo = team.find(t => t.id === lead.assignedToId);
+                      const isSelected = selectedLeads.includes(lead.id);
+                      const hasDownPayment = lead.hasDownPayment || false;
 
-                    return (
-                      <div
-                        key={lead.id}
-                        draggable={selectedLeads.length === 0}
-                        onDragStart={(e) => onDragStart(e, lead.id)}
-                        className={`p-4 rounded-lg shadow-sm border-2 transition-all cursor-grab active:cursor-grabbing relative group ${hasDownPayment
-                          ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300'
-                          : 'bg-white'
-                          } ${draggedLeadId === lead.id ? 'opacity-50' : 'opacity-100'} ${isSelected ? 'border-blue-500 bg-blue-50 shadow-md scale-[0.98]' : hasDownPayment ? 'border-amber-300 hover:shadow-md' : 'border-transparent hover:shadow-md'}`}
-                      >
-                        {isAdmin && (
-                          <button
-                            onClick={() => toggleLeadSelection(lead.id)}
-                            className={`absolute -top-2 -left-2 p-1 rounded-full shadow-md z-10 transition-colors ${isSelected ? 'bg-blue-600 text-white' : 'bg-white text-gray-300 hover:text-gray-400 border border-gray-100'}`}
-                          >
-                            {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                          </button>
-                        )}
+                      return (
+                        <div
+                          key={lead.id}
+                          draggable={selectedLeads.length === 0}
+                          onDragStart={(e) => onDragStart(e, lead.id)}
+                          className={`p-4 rounded-lg shadow-sm border-2 transition-all cursor-grab active:cursor-grabbing relative group ${hasDownPayment
+                            ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300'
+                            : 'bg-white'
+                            } ${draggedLeadId === lead.id ? 'opacity-50' : 'opacity-100'} ${isSelected ? 'border-blue-500 bg-blue-50 shadow-md scale-[0.98]' : hasDownPayment ? 'border-amber-300 hover:shadow-md' : 'border-transparent hover:shadow-md'}`}
+                        >
+                          {isAdmin && (
+                            <button
+                              onClick={() => toggleLeadSelection(lead.id)}
+                              className={`absolute -top-2 -left-2 p-1 rounded-full shadow-md z-10 transition-colors ${isSelected ? 'bg-blue-600 text-white' : 'bg-white text-gray-300 hover:text-gray-400 border border-gray-100'}`}
+                            >
+                              {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                            </button>
+                          )}
 
-                        {/* Badge de Sinal Pendente */}
-                        {hasDownPayment && (
-                          <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-bold px-2 py-1 rounded-full shadow-md z-10 flex items-center gap-1">
-                            <span>⚠</span> Sinal Pendente
-                          </div>
-                        )}
-
-                        {/* Barra de Ações (Fica no Topo e aparece no Hover) */}
-                        <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 scale-90 group-hover:scale-100 pointer-events-none group-hover:pointer-events-auto">
-                          <a
-                            href={getWhatsAppLink(lead, isAdmin ? (assignedTo?.name || user?.name) : user?.name)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black shadow-lg flex items-center gap-2 transition-transform hover:scale-110 active:scale-95 whitespace-nowrap"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" /> Falar no WhatsApp
-                          </a>
-                        </div>
-
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-bold text-gray-800 text-sm leading-tight">{lead.name}</h4>
-                          <div className="relative group/menu">
-                            <button className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"><MoreHorizontal className="w-4 h-4" /></button>
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white border rounded shadow-2xl hidden group-hover/menu:block z-30 py-1.5 animate-fade-in">
-                              <p className="px-3 py-1 text-[9px] text-gray-400 font-bold uppercase border-b mb-1">Mover Etapa:</p>
-                              {statuses.map(s => (
-                                <button key={s} onClick={() => handleStatusChange(lead.id, s)} className="block w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 hover:text-blue-700 transition-colors font-medium">
-                                  {STATUS_LABELS[s]}
-                                </button>
-                              ))}
-                              {isAdmin && (
-                                <>
-                                  <div className="border-t my-1"></div>
-                                  <button
-                                    onClick={() => { setActiveLeadId(lead.id); setIsReassignModalOpen(true); }}
-                                    className="block w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-50 text-indigo-600 font-bold transition-colors flex items-center gap-2"
-                                  >
-                                    <UserPlus className="w-3.5 h-3.5" /> Transferir Lead
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-gray-600 mb-1 font-medium">{lead.role}</p>
-                        <p className="text-[11px] text-gray-400 mb-2">{lead.phone}</p>
-
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {lead.classLocation && (
-                            <div className="text-[10px] text-gray-500 flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-                              <Globe className="w-3 h-3" /> {lead.classLocation}
+                          {/* Badge de Sinal Pendente */}
+                          {hasDownPayment && (
+                            <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-bold px-2 py-1 rounded-full shadow-md z-10 flex items-center gap-1">
+                              <span>⚠</span> Sinal Pendente
                             </div>
                           )}
-                          <div className="text-[10px] text-gray-400 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
-                            <Calendar className="w-3 h-3" /> {new Date(lead.createdAt).toLocaleDateString()}
-                          </div>
-                        </div>
 
-                        {assignedTo && (
-                          <div className={`mb-3 flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full border font-semibold w-fit ${isAdmin ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                            <UserCheck className="w-3 h-3" /> {assignedTo.name}
+                          {/* Barra de Ações (Fica no Topo e aparece no Hover) */}
+                          <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 scale-90 group-hover:scale-100 pointer-events-none group-hover:pointer-events-auto">
+                            <a
+                              href={getWhatsAppLink(lead, isAdmin ? (assignedTo?.name || user?.name) : user?.name)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black shadow-lg flex items-center gap-2 transition-transform hover:scale-110 active:scale-95 whitespace-nowrap"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" /> Falar no WhatsApp
+                            </a>
                           </div>
-                        )}
 
-                        {/* Exibição de Valores - Diferente para sinal vs pagamento completo */}
-                        {lead.saleValue && (
-                          <div className={`mt-3 pt-3 border-t text-[10px] flex flex-col gap-1.5 ${hasDownPayment ? 'border-amber-200' : 'border-gray-200'}`}>
-                            {hasDownPayment ? (
-                              <>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-amber-700 font-medium">Valor Total:</span>
-                                  <span className="font-bold text-gray-800">R$ {lead.saleValue.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between items-center bg-amber-100 px-2 py-1 rounded">
-                                  <span className="text-amber-800 font-bold">Sinal Pago:</span>
-                                  <span className="font-bold text-amber-900">R$ {(lead.downPaymentValue || 0).toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between items-center bg-white px-2 py-1 rounded border border-amber-200">
-                                  <span className="text-red-700 font-bold">Saldo Restante:</span>
-                                  <span className="font-black text-red-600">R$ {(lead.remainingBalance || 0).toLocaleString()}</span>
-                                </div>
-                                <div className="text-[9px] text-amber-600 font-bold text-center mt-1 animate-pulse italic">
-                                  Arraste para "Fechados" para quitar
-                                </div>
-                              </>
-                            ) : (
-                              <div className="flex justify-between items-center">
-                                <span className="font-bold text-green-600 text-sm">R$ {lead.saleValue.toLocaleString()}</span>
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-bold text-gray-800 text-sm leading-tight">{lead.name}</h4>
+                            <div className="relative group/menu">
+                              <button className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"><MoreHorizontal className="w-4 h-4" /></button>
+                              <div className="absolute right-0 top-full mt-1 w-48 bg-white border rounded shadow-2xl hidden group-hover/menu:block z-30 py-1.5 animate-fade-in">
+                                <p className="px-3 py-1 text-[9px] text-gray-400 font-bold uppercase border-b mb-1">Mover Etapa:</p>
+                                {statuses.map(s => (
+                                  <button key={s} onClick={() => handleStatusChange(lead.id, s)} className="block w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 hover:text-blue-700 transition-colors font-medium">
+                                    {STATUS_LABELS[s]}
+                                  </button>
+                                ))}
+                                {isAdmin && (
+                                  <>
+                                    <div className="border-t my-1"></div>
+                                    <button
+                                      onClick={() => { setActiveLeadId(lead.id); setIsReassignModalOpen(true); }}
+                                      className="block w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-50 text-indigo-600 font-bold transition-colors flex items-center gap-2"
+                                    >
+                                      <UserPlus className="w-3.5 h-3.5" /> Transferir Lead
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-gray-600 mb-1 font-medium">{lead.role}</p>
+                          <p className="text-[11px] text-gray-400 mb-2">{lead.phone}</p>
+
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {lead.classLocation && (
+                              <div className="text-[10px] text-gray-500 flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                                <Globe className="w-3 h-3" /> {lead.classLocation}
                               </div>
                             )}
+                            <div className="text-[10px] text-gray-400 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
+                              <Calendar className="w-3 h-3" /> {new Date(lead.createdAt).toLocaleDateString()}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+
+                          {assignedTo && (
+                            <div className={`mb-3 flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full border font-semibold w-fit ${isAdmin ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                              <UserCheck className="w-3 h-3" /> {assignedTo.name}
+                            </div>
+                          )}
+
+                          {/* Exibição de Valores - Diferente para sinal vs pagamento completo */}
+                          {lead.saleValue && (
+                            <div className={`mt-3 pt-3 border-t text-[10px] flex flex-col gap-1.5 ${hasDownPayment ? 'border-amber-200' : 'border-gray-200'}`}>
+                              {hasDownPayment ? (
+                                <>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-amber-700 font-medium">Valor Total:</span>
+                                    <span className="font-bold text-gray-800">R$ {lead.saleValue.toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center bg-amber-100 px-2 py-1 rounded">
+                                    <span className="text-amber-800 font-bold">Sinal Pago:</span>
+                                    <span className="font-bold text-amber-900">R$ {(lead.downPaymentValue || 0).toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center bg-white px-2 py-1 rounded border border-amber-200">
+                                    <span className="text-red-700 font-bold">Saldo Restante:</span>
+                                    <span className="font-black text-red-600">R$ {(lead.remainingBalance || 0).toLocaleString()}</span>
+                                  </div>
+                                  <div className="text-[9px] text-amber-600 font-bold text-center mt-1 animate-pulse italic">
+                                    Arraste para "Fechados" para quitar
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="flex justify-between items-center">
+                                  <span className="font-bold text-green-600 text-sm">R$ {lead.saleValue.toLocaleString()}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 
