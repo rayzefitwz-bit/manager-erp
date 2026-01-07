@@ -634,6 +634,60 @@ export const CRM = () => {
 
     return matchesSearch && matchesStatus && matchesSeller && matchesDate;
   });
+
+  // Calculate notifications for stale leads from previous day
+  const getStaleLeadNotifications = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get leads visible to current user
+    const userLeads = leads.filter(lead => {
+      if (!isAdmin && lead.assignedToId !== user?.id) {
+        return false;
+      }
+      return true;
+    });
+
+    // Group stale leads by status
+    const staleByStatus: Record<LeadStatus, number> = {
+      'NOVO': 0,
+      'LIGACAO': 0,
+      'WHATSAPP': 0,
+      'SEM_RESPOSTA': 0,
+      'NEGOCIANDO': 0,
+      'GANHO': 0
+    };
+
+    userLeads.forEach(lead => {
+      // Skip NEGOCIANDO and GANHO statuses
+      if (lead.status === 'NEGOCIANDO' || lead.status === 'GANHO') {
+        return;
+      }
+
+      const updatedAt = new Date(lead.updatedAt);
+      updatedAt.setHours(0, 0, 0, 0);
+
+      // Check if lead was last updated before today (yesterday or earlier)
+      if (updatedAt < today) {
+        staleByStatus[lead.status]++;
+      }
+    });
+
+    // Convert to array of notifications
+    return Object.entries(staleByStatus)
+      .filter(([status, count]) => count > 0)
+      .map(([status, count]) => ({
+        status: status as LeadStatus,
+        count
+      }));
+  };
+
+  const staleNotifications = getStaleLeadNotifications();
+
   const getWhatsAppLink = (lead: Lead, sellerName: string = 'Consultor') => {
     const cleanPhone = lead.phone.replace(/\D/g, '');
     const city = lead.classLocation || '';
@@ -811,6 +865,43 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
         onConfirm={handleSyncConfigSubmit}
         team={team}
       />
+
+      {/* Notification Banner for Stale Leads */}
+      {staleNotifications.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {staleNotifications.map(notification => (
+            <div
+              key={notification.status}
+              className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-500 p-4 rounded-lg shadow-sm flex items-center gap-3 animate-fade-in"
+            >
+              <div className="flex-shrink-0">
+                <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-amber-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-amber-900">
+                  Você tem {notification.count} Lead{notification.count > 1 ? 's' : ''} que ainda {notification.count > 1 ? 'estão' : 'está'} no estágio{' '}
+                  <span className="text-amber-700 underline decoration-2">
+                    {STATUS_LABELS[notification.status]}
+                  </span>
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  {notification.count > 1 ? 'Estes leads não foram movidos' : 'Este lead não foi movido'} desde ontem. Que tal dar atenção a {notification.count > 1 ? 'eles' : 'ele'}?
+                </p>
+              </div>
+              <button
+                onClick={() => setFilterStatus(notification.status)}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-xs font-bold shadow-sm flex items-center gap-1"
+              >
+                <Target className="w-3 h-3" />
+                Ver Leads
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Bulk Actions Bar */}
       {isAdmin && selectedLeads.length > 0 && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 bg-blue-700 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-6 animate-fade-in border border-blue-600">
