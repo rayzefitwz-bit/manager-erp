@@ -31,7 +31,7 @@ export const Commissions = () => {
         l.status === 'GANHO' &&
         !l.hasDownPayment && // Apenas matrículas completas contam para comissão
         !l.commissionPaymentId &&
-        filterBySelectedMonth(l.createdAt)
+        (l.wonAt ? filterBySelectedMonth(l.wonAt) : filterBySelectedMonth(l.createdAt))
       );
       const count = sales.length;
       const volume = sales.reduce((acc, curr) => acc + (curr.saleValue || 0), 0);
@@ -59,7 +59,7 @@ export const Commissions = () => {
         l.assignedToId === member.id &&
         l.status === 'GANHO' &&
         l.hasDownPayment === true &&
-        filterBySelectedMonth(l.createdAt)
+        (l.wonAt ? filterBySelectedMonth(l.wonAt) : filterBySelectedMonth(l.createdAt))
       );
       const count = downPayments.length;
       const totalValue = downPayments.reduce((acc, curr) => acc + (curr.saleValue || 0), 0);

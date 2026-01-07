@@ -21,7 +21,7 @@ const Card = ({ title, value, icon: Icon, color, subtitle }: any) => (
 );
 
 export const Dashboard = () => {
-  const { transactions, leads, immersiveClasses, team } = useApp();
+  const { transactions, leads, immersiveClasses, team, leadHistory, showToast } = useApp();
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
 
@@ -42,14 +42,22 @@ export const Dashboard = () => {
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   // Matrículas Geral (Mês Atual) - Apenas Completas
-  const monthlyWonLeads = leads.filter(l => l.status === 'GANHO' && !l.hasDownPayment && isCurrentMonth(l.createdAt));
+  const monthlyWonLeads = leads.filter(l =>
+    l.status === 'GANHO' &&
+    !l.hasDownPayment &&
+    l.wonAt && isCurrentMonth(l.wonAt)
+  );
 
   // --- Lógica de Ranqueamento de Vendedores ---
   const sellers = team.filter(m => m.role === 'VENDEDOR');
 
   const sellerStats = sellers.map(seller => {
     const sellerLeads = leads.filter(l => l.assignedToId === seller.id);
-    const sellerWon = sellerLeads.filter(l => l.status === 'GANHO' && !l.hasDownPayment && isCurrentMonth(l.createdAt));
+    const sellerWon = sellerLeads.filter(l =>
+      l.status === 'GANHO' &&
+      !l.hasDownPayment &&
+      l.wonAt && isCurrentMonth(l.wonAt)
+    );
     const sellerTotalMonth = sellerLeads.filter(l => isCurrentMonth(l.createdAt)).length;
 
     const revenue = sellerWon.reduce((acc, curr) => acc + (curr.saleValue || 0), 0);
@@ -344,6 +352,77 @@ export const Dashboard = () => {
               </PieChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      </div>
+
+      {/* Atividades Recentes (NOVO) */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mt-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2 text-indigo-800">
+            <TrendingUp className="w-5 h-5" />
+            <h3 className="text-lg font-bold">Atividades Recentes</h3>
+          </div>
+          <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-black uppercase">Tempo Real</span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-50">
+              <tr>
+                <th className="pb-3 pr-4">Data/Hora</th>
+                <th className="pb-3 px-4">Evento / Descrição</th>
+                <th className="pb-3 px-4">Categoria</th>
+                <th className="pb-3 text-right">Valor</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {[...transactions, ...leadHistory.map(h => ({
+                id: h.id,
+                date: h.createdAt,
+                description: `${h.leadName}: ${h.oldStatus} → ${h.newStatus}`,
+                type: 'HISTORY',
+                category: 'Vendas'
+              }))]
+                .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .slice(0, 10)
+                .map((item: any) => (
+                  <tr key={item.id} className="group hover:bg-gray-50 transition-colors">
+                    <td className="py-4 pr-4 whitespace-nowrap text-xs text-gray-500 font-medium">
+                      {new Date(item.date).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${item.type === 'INCOME' ? 'bg-green-50 text-green-600' :
+                            item.type === 'EXPENSE' ? 'bg-red-50 text-red-600' :
+                              'bg-blue-50 text-blue-600'
+                          }`}>
+                          {item.type === 'INCOME' ? <TrendingUp className="w-3.5 h-3.5" /> :
+                            item.type === 'EXPENSE' ? <TrendingDown className="w-3.5 h-3.5" /> :
+                              <Users className="w-3.5 h-3.5" />}
+                        </div>
+                        <span className="text-sm font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">
+                          {item.description}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="text-[10px] font-black uppercase tracking-tighter text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                        {item.category || 'Sistema'}
+                      </span>
+                    </td>
+                    <td className="py-4 text-right font-black text-sm">
+                      {item.amount ? (
+                        <span className={item.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}>
+                          {item.type === 'INCOME' ? '+' : '-'} R$ {item.amount.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">--</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

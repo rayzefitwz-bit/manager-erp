@@ -1,8 +1,8 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Lead, Transaction, TeamMember, LeadStatus, SaleRecord, Modality, KnowledgeItem, ImmersiveClass, LeadHistoryEntry, CommissionPaymentRecord, Supplier } from '../types';
 import { MOCK_TEAM } from '../constants';
 import { supabase } from '../supabase';
+import { CheckCircle, Info, AlertCircle } from 'lucide-react';
 
 interface SyncConfig {
   url: string;
@@ -22,7 +22,8 @@ interface AppContextType {
   suppliersSyncUrl: string | null;
   lastSyncConfig: SyncConfig | null;
   isLoading: boolean;
-  addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'status' | 'updatedAt'>) => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'status'>) => Promise<void>;
   updateLeadStatus: (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string; hasDownPayment?: boolean; downPaymentValue?: number; remainingBalance?: number }, observation?: string, changedBy?: { id: string; name: string }) => void;
   reassignLeads: (leadIds: string[], sellerId: string) => void;
   importLeads: (leadsData: Array<{ name: string; phone: string; role?: string; classLocation?: string; createdAt?: string }>, totalImportCost: number, assignmentConfig?: { type: 'SINGLE' | 'EQUAL', sellerId?: string }, sheetsUrl?: string, investmentClassLocation?: string) => void;
@@ -56,6 +57,12 @@ const DEFAULT_CLASSES: ImmersiveClass[] = [
 
 export const AppProvider = ({ children }: { children?: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
   const [leads, setLeads] = useState<Lead[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [team, setTeam] = useState<TeamMember[]>(MOCK_TEAM as TeamMember[]);
@@ -198,7 +205,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
             ...lead,
             assignedToId: nextSeller.id,
             updatedAt: now.toISOString(),
-            observation: (lead.observation || '') + `\n[Sistema] Realocado automaticamente por inatividade (>72h). Antigo: ${sellers[currentIndex]?.name}`
+            observation: (lead.observation || '') + `\n[Sistema] Realocado automaticamente por inatividade(> 72h).Antigo: ${sellers[currentIndex]?.name} `
           };
         }
         return lead;
@@ -214,7 +221,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         await supabase.from('leads').update({
           assignedToId: nextSeller.id,
           updatedAt: now.toISOString(),
-          observation: (lead.observation || '') + `\n[Sistema] Realocado automaticamente por inatividade (>72h).`
+          observation: (lead.observation || '') + `\n[Sistema] Realocado automaticamente por inatividade(> 72h).`
         }).eq('id', lead.id);
       }
     };
@@ -257,53 +264,63 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   const updateLeadStatus = async (leadId: string, status: LeadStatus, saleData?: { value: number; modality: Modality; paymentMethod: string; sellerId: string; classLocation: string; hasDownPayment?: boolean; downPaymentValue?: number; remainingBalance?: number }, observation?: string, changedBy?: { id: string; name: string }) => {
-    let updatedLeadFinal: Lead | null = null;
     let oldStatus: LeadStatus | undefined;
+    let updatedLeadFinal: Lead | null = null;
 
-    setLeads((prev) =>
-      prev.map((lead) => {
-        if (lead.id !== leadId) return lead;
-        oldStatus = lead.status;
-        const updatedLead: Lead = {
-          ...lead,
-          status,
-          observation: observation || lead.observation,
-          updatedAt: new Date().toISOString(),
-          lostAt: status === 'SEM_RESPOSTA' ? new Date().toISOString() : undefined
-        };
-        if (status === 'GANHO' && saleData) {
-          updatedLead.saleValue = saleData.value;
-          updatedLead.modality = saleData.modality;
-          updatedLead.paymentMethod = saleData.paymentMethod;
-          updatedLead.assignedToId = saleData.sellerId;
-          updatedLead.classLocation = saleData.classLocation;
+    // 1. Calculate the new state first
+    const leadsCopy = [...leads];
+    const leadIndex = leadsCopy.findIndex(l => l.id === leadId);
 
-          // Down Payment Logic
-          if (saleData.hasDownPayment) {
-            updatedLead.hasDownPayment = true;
-            updatedLead.downPaymentValue = saleData.downPaymentValue;
-            updatedLead.remainingBalance = saleData.remainingBalance;
-          } else {
-            updatedLead.hasDownPayment = false;
-            updatedLead.downPaymentValue = undefined;
-            updatedLead.remainingBalance = undefined;
-          }
+    if (leadIndex === -1) return;
 
-          addTransaction({
-            type: 'INCOME',
-            amount: saleData.hasDownPayment ? (saleData.downPaymentValue || 0) : saleData.value, // Registra apenas o que foi pago
-            description: saleData.hasDownPayment
-              ? `Sinal Imersão - ${lead.name} (${saleData.classLocation})`
-              : `Venda Imersão - ${lead.name} (${saleData.classLocation})`,
-            date: new Date().toISOString(),
-            category: 'Vendas',
-          });
-        }
-        updatedLeadFinal = updatedLead;
-        return updatedLead;
-      })
-    );
+    const lead = leadsCopy[leadIndex];
+    oldStatus = lead.status;
 
+    const updatedLead: Lead = {
+      ...lead,
+      status,
+      observation: observation || lead.observation,
+      updatedAt: new Date().toISOString(),
+      lostAt: status === 'SEM_RESPOSTA' ? new Date().toISOString() : undefined,
+      wonAt: status === 'GANHO' ? new Date().toISOString() : lead.wonAt
+    };
+
+    if (status === 'GANHO' && saleData) {
+      updatedLead.saleValue = saleData.value;
+      updatedLead.modality = saleData.modality;
+      updatedLead.paymentMethod = saleData.paymentMethod;
+      updatedLead.assignedToId = saleData.sellerId;
+      updatedLead.classLocation = saleData.classLocation;
+
+      // Down Payment Logic
+      if (saleData.hasDownPayment) {
+        updatedLead.hasDownPayment = true;
+        updatedLead.downPaymentValue = saleData.downPaymentValue;
+        updatedLead.remainingBalance = saleData.remainingBalance;
+      } else {
+        updatedLead.hasDownPayment = false;
+        updatedLead.downPaymentValue = undefined;
+        updatedLead.remainingBalance = undefined;
+      }
+
+      addTransaction({
+        type: 'INCOME',
+        amount: saleData.hasDownPayment ? (saleData.downPaymentValue || 0) : saleData.value,
+        description: saleData.hasDownPayment
+          ? `Sinal Imersão - ${lead.name} (${saleData.classLocation})`
+          : `Venda Imersão - ${lead.name} (${saleData.classLocation})`,
+        date: new Date().toISOString(),
+        category: 'Vendas',
+      });
+    }
+
+    updatedLeadFinal = updatedLead;
+
+    // 2. Update React State
+    leadsCopy[leadIndex] = updatedLead;
+    setLeads(leadsCopy);
+
+    // 3. Update Supabase
     if (updatedLeadFinal) {
       await supabase.from('leads').update(updatedLeadFinal).eq('id', leadId);
 
@@ -311,7 +328,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       const historyEntry: LeadHistoryEntry = {
         id: crypto.randomUUID(),
         leadId,
-        leadName: (updatedLeadFinal as Lead).name,
+        leadName: updatedLeadFinal.name,
         oldStatus,
         newStatus: status,
         observation,
@@ -322,19 +339,29 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
 
       setLeadHistory(prev => [historyEntry, ...prev]);
       await supabase.from('lead_history').insert(historyEntry);
+
+      if (status === 'GANHO') {
+        showToast("Venda registrada com sucesso! 🚀", "success");
+      } else {
+        showToast(`Lead movido para ${status}`, "info");
+      }
     }
-  }
+  };
+
+
+
+
   const settleDownPayment = async (leadId: string, amount: number, paymentMethod: string, observation?: string) => {
     const lead = leads.find(l => l.id === leadId);
     if (!lead) return;
 
-    const notes = observation || `[Sistema] Matrícula quitada. Sinal anterior: R$ ${(lead.downPaymentValue || 0).toLocaleString()} + Pagamento Final: R$ ${amount.toLocaleString()}`;
+    const notes = observation || `[Sistema] Matrícula quitada.Sinal anterior: R$ ${(lead.downPaymentValue || 0).toLocaleString()} + Pagamento Final: R$ ${amount.toLocaleString()} `;
 
     // 1. Add Transaction for the remaining amount
     await addTransaction({
       type: 'INCOME',
       amount: amount,
-      description: `Quit. Matrícula - ${lead.name} (${lead.classLocation})`,
+      description: `Quit.Matrícula - ${lead.name} (${lead.classLocation})`,
       date: new Date().toISOString(),
       category: 'Vendas',
       paymentMethod: paymentMethod
@@ -347,6 +374,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       downPaymentValue: undefined,
       remainingBalance: undefined, // Cleared
       updatedAt: new Date().toISOString(),
+      wonAt: new Date().toISOString(), // Update wonAt to settlement date
       observation: (lead.observation || '') + '\n' + notes
     };
 
@@ -369,13 +397,15 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       leadName: lead.name,
       oldStatus: 'GANHO',
       newStatus: 'GANHO',
-      observation: `Matrícula Completada: ${notes}`,
+      observation: `Matrícula Completada: ${notes} `,
       changedById: '00000000-0000-0000-0000-000000000000',
       changedByName: 'Sistema',
       createdAt: new Date().toISOString()
     };
     setLeadHistory(prev => [historyEntry, ...prev]);
     await supabase.from('lead_history').insert(historyEntry);
+
+    showToast("Matrícula quitada com sucesso! 🎉", "success");
   };
 
   const reassignLeads = async (leadIds: string[], sellerId: string) => {
@@ -384,6 +414,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       leadIds.includes(lead.id) ? { ...lead, assignedToId: sellerId, updatedAt: now } : lead
     ));
     await supabase.from('leads').update({ assignedToId: sellerId, updatedAt: now }).in('id', leadIds);
+    showToast(`${leadIds.length} lead(s) reatribuídos.`, "info");
   };
 
   const deleteLeads = async (leadIds: string[]) => {
@@ -460,7 +491,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       addTransaction({
         type: 'EXPENSE',
         amount: totalImportCost,
-        description: `Importação de Leads (${newLeads.length} novos leads)`,
+        description: `Importação de Leads(${newLeads.length} novos leads)`,
         date: new Date().toISOString(),
         category: 'Leads',
         classLocation: investmentClassLocation
@@ -646,10 +677,21 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         addLead, updateLeadStatus, reassignLeads, importLeads, deleteLeads, clearLeads, addTransaction, payCommission,
         addSupplier, removeSupplier, syncSuppliers,
         addTeamMember, removeTeamMember, getSalesBySeller, addKnowledgeItem, removeKnowledgeItem,
-        syncKnowledgeItem, addClass, updateClass, removeClass, settleDownPayment
+        syncKnowledgeItem, addClass, updateClass, removeClass, settleDownPayment, showToast
       }}
     >
       {children}
+      {toast && (
+        <div className={`fixed bottom - 6 right - 6 z - [100] animate - bounce -in flex items - center gap - 3 px - 6 py - 4 rounded - 2xl shadow - 2xl border ${toast.type === 'success' ? 'bg-green-600 border-green-500 text-white' :
+          toast.type === 'error' ? 'bg-red-600 border-red-500 text-white' :
+            'bg-blue-600 border-blue-500 text-white'
+          } `}>
+          <div className="bg-white/20 p-2 rounded-full">
+            <CheckCircle className="w-5 h-5" />
+          </div>
+          <div className="font-bold">{toast.message}</div>
+        </div>
+      )}
     </AppContext.Provider>
   );
 };

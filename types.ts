@@ -25,6 +25,7 @@ export interface Lead {
   hasDownPayment?: boolean; // Indica se tem apenas sinal de entrada
   downPaymentValue?: number; // Valor do sinal pago
   remainingBalance?: number; // Saldo restante a ser pago
+  wonAt?: string; // Data em que a venda foi fechada ou sinal quitado
 }
 
 export interface LeadHistoryEntry {
