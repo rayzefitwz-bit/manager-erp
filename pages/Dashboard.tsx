@@ -3,7 +3,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, Users, Wallet, Target, MapPin, Award, Trophy, Star, GraduationCap } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, Wallet, Target, MapPin, Award, Trophy, Star, GraduationCap, DollarSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { clsx } from 'clsx';
 
@@ -41,15 +41,15 @@ export const Dashboard = () => {
     .filter(t => t.type === 'INCOME')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
-  // Matrículas Geral (Mês Atual)
-  const monthlyWonLeads = leads.filter(l => l.status === 'GANHO' && isCurrentMonth(l.createdAt));
+  // Matrículas Geral (Mês Atual) - Apenas Completas
+  const monthlyWonLeads = leads.filter(l => l.status === 'GANHO' && !l.hasDownPayment && isCurrentMonth(l.createdAt));
 
   // --- Lógica de Ranqueamento de Vendedores ---
   const sellers = team.filter(m => m.role === 'VENDEDOR');
 
   const sellerStats = sellers.map(seller => {
     const sellerLeads = leads.filter(l => l.assignedToId === seller.id);
-    const sellerWon = sellerLeads.filter(l => l.status === 'GANHO' && isCurrentMonth(l.createdAt));
+    const sellerWon = sellerLeads.filter(l => l.status === 'GANHO' && !l.hasDownPayment && isCurrentMonth(l.createdAt));
     const sellerTotalMonth = sellerLeads.filter(l => isCurrentMonth(l.createdAt)).length;
 
     const revenue = sellerWon.reduce((acc, curr) => acc + (curr.saleValue || 0), 0);
@@ -88,8 +88,12 @@ export const Dashboard = () => {
     .filter(t => t.type === 'EXPENSE' && t.category === 'Leads')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
-  const totalWonLeads = leads.filter(l => l.status === 'GANHO').length;
+  const totalWonLeads = leads.filter(l => l.status === 'GANHO' && !l.hasDownPayment).length;
   const generalCAC = totalWonLeads > 0 ? (totalLeadInvestment / totalWonLeads) : 0;
+
+  // Valores a Receber (Sinais Pendentes)
+  const downPaymentLeads = leads.filter(l => l.status === 'GANHO' && l.hasDownPayment);
+  const totalReceivables = downPaymentLeads.reduce((acc, curr) => acc + (curr.remainingBalance || 0), 0);
 
   // Análise de CAC por Turma
   const cacByClass = immersiveClasses.map(cls => {
@@ -97,7 +101,7 @@ export const Dashboard = () => {
       .filter(t => t.type === 'EXPENSE' && t.category === 'Leads' && t.classLocation === cls.city)
       .reduce((acc, curr) => acc + curr.amount, 0);
 
-    const classWonLeads = leads.filter(l => l.status === 'GANHO' && l.classLocation === cls.city).length;
+    const classWonLeads = leads.filter(l => l.status === 'GANHO' && !l.hasDownPayment && l.classLocation === cls.city).length;
     const classCAC = classWonLeads > 0 ? (classInvestment / classWonLeads) : 0;
 
     return {
@@ -268,8 +272,9 @@ export const Dashboard = () => {
       <h2 className="text-2xl font-bold text-gray-800">Dashboard Geral</h2>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card title="Receita Total" value={`R$ ${adminTotalIncome.toLocaleString()}`} icon={TrendingUp} color="bg-green-500" />
+        <Card title="Valores a Receber" value={`R$ ${totalReceivables.toLocaleString()}`} icon={DollarSign} color="bg-amber-500" subtitle="Sinais Pendentes" />
         <Card title="Investimento Leads" value={`R$ ${totalLeadInvestment.toLocaleString()}`} icon={Target} color="bg-blue-600" />
         <Card title="CAC Geral" value={`R$ ${generalCAC.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={Wallet} color="bg-indigo-600" subtitle="Custo por Matrícula" />
         <Card title="Taxa Conversão" value={`${conversionRate}%`} icon={Users} color="bg-purple-500" />
