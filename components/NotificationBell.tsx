@@ -10,7 +10,7 @@ export const NotificationBell = () => {
     const { user } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
 
-    if (user?.role === 'PROFESSOR') return null;
+    if (!user || user.role === 'PROFESSOR') return null;
 
     const myLeads = leads.filter(l => l.assignedToId === user.id && l.status !== 'GANHO');
     const now = new Date();
