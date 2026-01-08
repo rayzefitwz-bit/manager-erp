@@ -97,6 +97,7 @@ export interface KnowledgeItem {
   category?: string;
   link?: string;
   syncUrl?: string; // Novo: URL de sincronização direta (Docs/Sheets)
+  attachments?: { name: string; url: string; type: 'image' | 'video' }[];
   updatedAt: string;
 }
 

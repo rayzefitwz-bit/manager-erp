@@ -40,6 +40,7 @@ interface AppContextType {
   addKnowledgeItem: (item: Omit<KnowledgeItem, 'id' | 'updatedAt'>) => void;
   removeKnowledgeItem: (id: string) => void;
   syncKnowledgeItem: (id: string) => Promise<void>;
+  uploadFile: (file: File) => Promise<string>;
   addClass: (cls: Omit<ImmersiveClass, 'id'>) => void;
   updateClass: (id: string, cls: Omit<ImmersiveClass, 'id'>) => void;
   removeClass: (id: string) => void;
@@ -734,6 +735,27 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     }
   };
 
+  const uploadFile = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${crypto.randomUUID()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error } = await supabase.storage
+      .from('knowledge-assets')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('Error uploading file:', error);
+      throw error;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('knowledge-assets')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -741,7 +763,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         addLead, updateLeadStatus, reassignLeads, importLeads, deleteLeads, clearLeads, addTransaction, payCommission,
         addSupplier, removeSupplier, syncSuppliers,
         addTeamMember, removeTeamMember, getSalesBySeller, addKnowledgeItem, removeKnowledgeItem,
-        syncKnowledgeItem, addClass, updateClass, removeClass, settleDownPayment, showToast, updateLeadFollowUp
+        syncKnowledgeItem, addClass, updateClass, removeClass, settleDownPayment, showToast, updateLeadFollowUp,
+        uploadFile
       }}
     >
       {children}
