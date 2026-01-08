@@ -802,10 +802,28 @@ const FollowUpModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
     }
   }, [isOpen, lead]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent, addToCalendar: boolean = false) => {
     e.preventDefault();
     if (date && time) {
-      onSubmit(`${date}T${time}:00`, note);
+      const dateTime = `${date}T${time}:00`;
+      onSubmit(dateTime, note);
+
+      if (addToCalendar) {
+        const start = dateTime.replace(/[-:]/g, '');
+        // Assume 30 min duration for follow-up
+        const endDate = new Date(new Date(dateTime).getTime() + 30 * 60000);
+
+        // Helper to format local date for Google Calendar (YYYYMMDDTHHMMSS)
+        const formatLocalDate = (d: Date) => {
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+        };
+
+        const end = formatLocalDate(endDate);
+
+        const calendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Follow-up: ${lead?.name}`)}&dates=${start}/${end}&details=${encodeURIComponent(note || 'Retornar contato com o lead.')}`;
+        window.open(calendarUrl, '_blank');
+      }
     } else {
       onSubmit(null, null);
     }
@@ -824,7 +842,7 @@ const FollowUpModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
           Defina uma data e hora para retornar o contato com <span className="font-bold">{lead?.name}</span>.
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => handleSubmit(e)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Data</label>
@@ -858,22 +876,37 @@ const FollowUpModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
             ></textarea>
           </div>
 
-          <div className="flex justify-between items-center mt-6">
-            <button
-              type="button"
-              onClick={() => { onSubmit(null, null); }}
-              className="text-xs font-bold text-red-500 hover:text-red-700 uppercase"
-            >
-              Remover Agendamento
-            </button>
-            <div className="flex gap-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg font-bold">Cancelar</button>
+          <div className="flex flex-col gap-3 mt-6">
+            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-dashed border-gray-200">
+              <span className="text-xs text-gray-500 font-medium">Sincronizar com sua agenda?</span>
               <button
-                type="submit"
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-md"
+                type="button"
+                onClick={(e) => handleSubmit(e, true)}
+                disabled={!date || !time}
+                className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-gray-50 disabled:opacity-50 transition-all shadow-sm"
               >
-                Salvar Lembrete
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                Salvar e Abrir no Google Calendar
               </button>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <button
+                type="button"
+                onClick={() => { onSubmit(null, null); }}
+                className="text-xs font-bold text-red-500 hover:text-red-700 uppercase"
+              >
+                Remover Agendamento
+              </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg font-bold">Cancelar</button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-md"
+                >
+                  Apenas Salvar Lembrete
+                </button>
+              </div>
             </div>
           </div>
         </form>
