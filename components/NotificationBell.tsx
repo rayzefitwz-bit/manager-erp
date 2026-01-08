@@ -6,25 +6,34 @@ import { useAuth } from '../context/AuthContext';
 import { clsx } from 'clsx';
 
 export const NotificationBell = () => {
-    const { leads, team } = useApp();
+    const { leads, team, updateLeadFollowUp } = useApp();
     const { user } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
 
-    if (user?.role !== 'VENDEDOR') return null;
+    if (user?.role === 'PROFESSOR') return null;
 
     const myLeads = leads.filter(l => l.assignedToId === user.id && l.status !== 'GANHO');
     const now = new Date();
 
     const followUpNotifications = myLeads
-        .filter(lead => lead.nextFollowUpDate && new Date(lead.nextFollowUpDate) <= now)
-        .map(lead => ({
-            id: `followup-${lead.id}`,
-            type: 'FOLLOWUP',
-            title: '⏰ Follow-up Agendado',
-            message: `Retornar contato para ${lead.name}: ${lead.nextFollowUpNote || 'Sem observação'}`,
-            time: new Date(lead.nextFollowUpDate!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            leadId: lead.id
-        }));
+        .filter(lead => lead.nextFollowUpDate)
+        .map(lead => {
+            const followUpDate = new Date(lead.nextFollowUpDate!);
+            const isDue = followUpDate <= now;
+            return {
+                id: `followup-${lead.id}`,
+                type: 'FOLLOWUP',
+                title: isDue ? '⏰ Follow-up Vencido' : '📅 Próximo Follow-up',
+                message: `Lead ${lead.name}: ${lead.nextFollowUpNote || 'Sem observação'}`,
+                time: followUpDate.toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+                leadId: lead.id,
+                isDue
+            };
+        }).sort((a, b) => {
+            if (a.isDue && !b.isDue) return -1;
+            if (!a.isDue && b.isDue) return 1;
+            return 0;
+        });
 
     const notifications = myLeads.map(lead => {
         // Skip if there's already a follow-up notification for this lead
@@ -111,14 +120,27 @@ export const NotificationBell = () => {
                                                 "p-2 rounded-lg h-fit",
                                                 notif.type === 'URGENT' ? "bg-red-50 text-red-600" :
                                                     notif.type === 'NEW' ? "bg-green-50 text-green-600" :
-                                                        notif.type === 'FOLLOWUP' ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"
+                                                        notif.type === 'FOLLOWUP' ? (notif.isDue ? "bg-red-50 text-red-600" : "bg-indigo-50 text-indigo-600") : "bg-blue-50 text-blue-600"
                                             )}>
                                                 {notif.type === 'URGENT' ? <AlertTriangle className="w-4 h-4" /> :
                                                     notif.type === 'NEW' ? <UserPlus className="w-4 h-4" /> :
                                                         notif.type === 'FOLLOWUP' ? <Clock className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                                             </div>
                                             <div className="flex-1">
-                                                <p className="text-sm font-bold text-gray-800 leading-tight mb-1">{notif.title}</p>
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <p className="text-sm font-bold text-gray-800 leading-tight">{notif.title}</p>
+                                                    {notif.type === 'FOLLOWUP' && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                updateLeadFollowUp(notif.leadId, null, null);
+                                                            }}
+                                                            className="text-[9px] bg-green-500 text-white px-2 py-0.5 rounded-full font-black uppercase hover:bg-green-600 shadow-sm"
+                                                        >
+                                                            Concluir
+                                                        </button>
+                                                    )}
+                                                </div>
                                                 <p className="text-xs text-gray-500 leading-relaxed">{notif.message}</p>
                                                 <p className="text-[10px] text-gray-400 mt-2 uppercase font-black">{notif.time}</p>
                                             </div>
