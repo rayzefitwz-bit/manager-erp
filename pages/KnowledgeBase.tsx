@@ -23,9 +23,18 @@ export const KnowledgeBase = () => {
   const [attachments, setAttachments] = useState<{ name: string; url: string; type: 'image' | 'video' }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Get unique categories from items in the active tab
+  const categories = Array.from(new Set(
+    knowledgeItems
+      .filter(item => item.type === activeTab && item.category)
+      .map(item => item.category!)
+  )).sort();
 
   const filteredItems = knowledgeItems.filter(item =>
     item.type === activeTab &&
+    (!selectedCategory || item.category === selectedCategory) &&
     (item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.category?.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -69,8 +78,8 @@ export const KnowledgeBase = () => {
       const type = file.type.startsWith('image/') ? 'image' : 'video';
       setAttachments(prev => [...prev, { name: file.name, url, type }]);
       showToast("Arquivo enviado com sucesso!", "success");
-    } catch (error) {
-      showToast("Erro ao fazer upload.", "error");
+    } catch (error: any) {
+      showToast(error.message || "Erro ao fazer upload.", "error");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -102,6 +111,27 @@ export const KnowledgeBase = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // Google Drive Link Helpers
+  const getDriveFileId = (url: string) => {
+    const dMatch = url.match(/\/d\/([^/]+)/);
+    if (dMatch) return dMatch[1];
+    const idMatch = url.match(/[?&]id=([^&]+)/);
+    if (idMatch) return idMatch[1];
+    return null;
+  };
+
+  const getPreviewUrl = (att: { url: string; type: 'image' | 'video' }) => {
+    if (att.url.includes('drive.google.com')) {
+      const id = getDriveFileId(att.url);
+      if (id) {
+        return att.type === 'image'
+          ? `https://drive.google.com/uc?export=view&id=${id}`
+          : `https://drive.google.com/file/d/${id}/preview`;
+      }
+    }
+    return att.url;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -120,7 +150,7 @@ export const KnowledgeBase = () => {
       {/* Tabs */}
       <div className="flex border-b border-gray-200">
         <button
-          onClick={() => { setActiveTab('SCRIPT'); setShowForm(false); }}
+          onClick={() => { setActiveTab('SCRIPT'); setShowForm(false); setSelectedCategory(null); }}
           className={clsx(
             "px-6 py-3 font-bold text-sm transition-all flex items-center gap-2 border-b-2",
             activeTab === 'SCRIPT' ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-400 hover:text-gray-600"
@@ -129,7 +159,7 @@ export const KnowledgeBase = () => {
           <MessageSquare className="w-4 h-4" /> Scripts & Objeções
         </button>
         <button
-          onClick={() => { setActiveTab('DOCUMENTO'); setShowForm(false); }}
+          onClick={() => { setActiveTab('DOCUMENTO'); setShowForm(false); setSelectedCategory(null); }}
           className={clsx(
             "px-6 py-3 font-bold text-sm transition-all flex items-center gap-2 border-b-2",
             activeTab === 'DOCUMENTO' ? "border-blue-600 text-blue-600" : "border-transparent text-gray-400 hover:text-gray-600"
@@ -138,6 +168,37 @@ export const KnowledgeBase = () => {
           <FileText className="w-4 h-4" /> Documentos & Manuais
         </button>
       </div>
+
+      {/* Categories Filter */}
+      {categories.length > 0 && (
+        <div className="flex flex-wrap gap-2 animate-fade-in">
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className={clsx(
+              "px-3 py-1.5 rounded-full text-xs font-bold transition-all border shadow-sm",
+              !selectedCategory
+                ? "bg-gray-800 text-white border-gray-800"
+                : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+            )}
+          >
+            Todos
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+              className={clsx(
+                "px-3 py-1.5 rounded-full text-xs font-bold transition-all border shadow-sm",
+                selectedCategory === cat
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="relative">
@@ -448,22 +509,32 @@ export const KnowledgeBase = () => {
                       <div key={idx} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                         {att.type === 'image' ? (
                           <div className="group relative">
-                            <img src={att.url} alt={att.name} className="w-full h-48 object-cover" />
+                            <img src={getPreviewUrl(att)} alt={att.name} className="w-full h-[300px] object-contain bg-gray-50" />
                             <a href={att.url} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <ExternalLink className="text-white w-8 h-8" />
                             </a>
                           </div>
                         ) : (
-                          <div className="bg-gray-900 h-48 flex items-center justify-center relative group">
-                            <Video className="w-12 h-12 text-white/50" />
-                            <a href={att.url} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2">
-                              <Video className="w-6 h-6" /> Play Vídeo
-                            </a>
+                          <div className="bg-gray-900 h-[300px] flex items-center justify-center relative group">
+                            {att.url.includes('drive.google.com') ? (
+                              <iframe
+                                src={getPreviewUrl(att)}
+                                className="w-full h-full border-none"
+                                allow="autoplay"
+                              ></iframe>
+                            ) : (
+                              <>
+                                <Video className="w-12 h-12 text-white/50" />
+                                <a href={att.url} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold gap-2">
+                                  <Video className="w-6 h-6" /> Play Vídeo Externo
+                                </a>
+                              </>
+                            )}
                           </div>
                         )}
                         <div className="p-3 flex justify-between items-center bg-gray-50">
                           <span className="text-xs font-bold text-gray-700 truncate mr-2">{att.name}</span>
-                          <a href={att.url} target="_blank" rel="noreferrer" className="text-indigo-600 font-bold text-[10px] uppercase hover:underline shrink-0">Baixar/Ver</a>
+                          <a href={att.url} target="_blank" rel="noreferrer" className="text-indigo-600 font-bold text-[10px] uppercase hover:underline shrink-0">Ver Original</a>
                         </div>
                       </div>
                     ))}

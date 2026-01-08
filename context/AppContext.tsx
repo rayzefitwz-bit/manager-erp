@@ -740,12 +740,15 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     const fileName = `${crypto.randomUUID()}.${fileExt}`;
     const filePath = `${fileName}`;
 
-    const { error } = await supabase.storage
+    const { data, error } = await supabase.storage
       .from('knowledge-assets')
       .upload(filePath, file);
 
     if (error) {
-      console.error('Error uploading file:', error);
+      console.error('Supabase Storage Error:', error.message, error);
+      if (error.message.includes('bucket not found')) {
+        throw new Error('Bucket "knowledge-assets" não encontrado no Supabase. Crie o bucket com acesso público para continuar.');
+      }
       throw error;
     }
 
