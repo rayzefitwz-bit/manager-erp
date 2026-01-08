@@ -15,7 +15,21 @@ export const NotificationBell = () => {
     const myLeads = leads.filter(l => l.assignedToId === user.id && l.status !== 'GANHO');
     const now = new Date();
 
+    const followUpNotifications = myLeads
+        .filter(lead => lead.nextFollowUpDate && new Date(lead.nextFollowUpDate) <= now)
+        .map(lead => ({
+            id: `followup-${lead.id}`,
+            type: 'FOLLOWUP',
+            title: '⏰ Follow-up Agendado',
+            message: `Retornar contato para ${lead.name}: ${lead.nextFollowUpNote || 'Sem observação'}`,
+            time: new Date(lead.nextFollowUpDate!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            leadId: lead.id
+        }));
+
     const notifications = myLeads.map(lead => {
+        // Skip if there's already a follow-up notification for this lead
+        if (lead.nextFollowUpDate && new Date(lead.nextFollowUpDate) <= now) return null;
+
         const lastUpdate = new Date(lead.updatedAt || lead.createdAt);
         const diffHours = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
 
@@ -56,7 +70,7 @@ export const NotificationBell = () => {
         leadId: lead.id
     }));
 
-    const allNotifications = [...recentReassignments, ...notifications];
+    const allNotifications = [...recentReassignments, ...followUpNotifications, ...notifications];
 
     return (
         <div className="relative">
@@ -96,10 +110,12 @@ export const NotificationBell = () => {
                                             <div className={clsx(
                                                 "p-2 rounded-lg h-fit",
                                                 notif.type === 'URGENT' ? "bg-red-50 text-red-600" :
-                                                    notif.type === 'NEW' ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"
+                                                    notif.type === 'NEW' ? "bg-green-50 text-green-600" :
+                                                        notif.type === 'FOLLOWUP' ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"
                                             )}>
                                                 {notif.type === 'URGENT' ? <AlertTriangle className="w-4 h-4" /> :
-                                                    notif.type === 'NEW' ? <UserPlus className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                                                    notif.type === 'NEW' ? <UserPlus className="w-4 h-4" /> :
+                                                        notif.type === 'FOLLOWUP' ? <Clock className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                                             </div>
                                             <div className="flex-1">
                                                 <p className="text-sm font-bold text-gray-800 leading-tight mb-1">{notif.title}</p>

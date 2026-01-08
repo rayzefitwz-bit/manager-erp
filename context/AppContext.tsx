@@ -44,6 +44,7 @@ interface AppContextType {
   updateClass: (id: string, cls: Omit<ImmersiveClass, 'id'>) => void;
   removeClass: (id: string) => void;
   settleDownPayment: (leadId: string, amount: number, paymentMethod: string, observation?: string) => Promise<void>;
+  updateLeadFollowUp: (leadId: string, date: string | null, note: string | null) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -718,6 +719,21 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     }
   };
 
+  const updateLeadFollowUp = async (leadId: string, date: string | null, note: string | null) => {
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, nextFollowUpDate: date || undefined, nextFollowUpNote: note || undefined } : l));
+    await supabase.from('leads').update({
+      nextFollowUpDate: date,
+      nextFollowUpNote: note,
+      updatedAt: new Date().toISOString()
+    }).eq('id', leadId);
+
+    if (date) {
+      showToast("Follow-up agendado com sucesso!", "success");
+    } else {
+      showToast("Agendamento removido.", "info");
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -725,7 +741,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         addLead, updateLeadStatus, reassignLeads, importLeads, deleteLeads, clearLeads, addTransaction, payCommission,
         addSupplier, removeSupplier, syncSuppliers,
         addTeamMember, removeTeamMember, getSalesBySeller, addKnowledgeItem, removeKnowledgeItem,
-        syncKnowledgeItem, addClass, updateClass, removeClass, settleDownPayment, showToast
+        syncKnowledgeItem, addClass, updateClass, removeClass, settleDownPayment, showToast, updateLeadFollowUp
       }}
     >
       {children}

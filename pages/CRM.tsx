@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { LeadStatus, Lead, Modality, ImmersiveClass } from '../types';
 import { STATUS_LABELS, STATUS_COLORS } from '../constants';
-import { MessageCircle, FileUp, MoreHorizontal, Plus, Users, Shuffle, UserCheck, Link, Globe, RefreshCw, Calendar, Target, UserPlus, CheckSquare, Square, XCircle, Trash2, DollarSign, CheckCircle } from 'lucide-react';
+import { MessageCircle, FileUp, MoreHorizontal, Plus, Users, Shuffle, UserCheck, Link, Globe, RefreshCw, Calendar, Target, UserPlus, CheckSquare, Square, XCircle, Trash2, DollarSign, CheckCircle, Clock } from 'lucide-react';
 import { read, utils } from 'xlsx';
 import confetti from 'canvas-confetti';
 
@@ -719,7 +719,7 @@ const SettlePaymentModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div className="bg-white p-6 rounded-xl shadow-xl w-[450px] animate-fade-in">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-[450px] animate-fade-in text-gray-800">
         <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-green-600" />
           Receber Pagamento Restante
@@ -767,7 +767,7 @@ const SettlePaymentModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
           </div>
 
           <div className="flex justify-end gap-2 mt-6">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg font-bold">Cancelar</button>
             <button
               type="submit"
               className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-bold shadow-md"
@@ -782,8 +782,108 @@ const SettlePaymentModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
   );
 };
 
+// Modal for scheduling follow-up
+const FollowUpModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (isOpen && lead) {
+      if (lead.nextFollowUpDate) {
+        const d = new Date(lead.nextFollowUpDate);
+        setDate(d.toISOString().split('T')[0]);
+        setTime(d.toTimeString().slice(0, 5));
+      } else {
+        setDate('');
+        setTime('');
+      }
+      setNote(lead.nextFollowUpNote || '');
+    }
+  }, [isOpen, lead]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (date && time) {
+      onSubmit(`${date}T${time}:00`, note);
+    } else {
+      onSubmit(null, null);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-[450px] animate-fade-in text-gray-800">
+        <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+          <Clock className="w-5 h-5 text-indigo-600" />
+          Agendar Follow-up
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Defina uma data e hora para retornar o contato com <span className="font-bold">{lead?.name}</span>.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Data</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                className="w-full border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+                required={!!time || !!note}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Hora</label>
+              <input
+                type="time"
+                value={time}
+                onChange={e => setTime(e.target.value)}
+                className="w-full border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+                required={!!date}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">O que precisa ser feito?</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              className="w-full border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+              rows={3}
+              placeholder="Ex: Ligar para confirmar presença às 8h"
+            ></textarea>
+          </div>
+
+          <div className="flex justify-between items-center mt-6">
+            <button
+              type="button"
+              onClick={() => { onSubmit(null, null); }}
+              className="text-xs font-bold text-red-500 hover:text-red-700 uppercase"
+            >
+              Remover Agendamento
+            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg font-bold">Cancelar</button>
+              <button
+                type="submit"
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-md"
+              >
+                Salvar Lembrete
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export const CRM = () => {
-  const { leads, team, isLoading, updateLeadStatus, addLead, reassignLeads, importLeads, deleteLeads, clearLeads, lastSyncConfig, settleDownPayment, immersiveClasses, showToast } = useApp();
+  const { leads, team, isLoading, updateLeadStatus, addLead, reassignLeads, importLeads, deleteLeads, clearLeads, lastSyncConfig, settleDownPayment, immersiveClasses, showToast, updateLeadFollowUp } = useApp();
   const { user } = useAuth();
 
   // States
@@ -800,6 +900,8 @@ export const CRM = () => {
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
+  const [leadForFollowUp, setLeadForFollowUp] = useState<Lead | null>(null);
 
   // Board Drag to Scroll States
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1031,6 +1133,19 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
       setIsSinalModalOpen(false);
       setActiveLeadId(null);
       setStoredObservation(null);
+    }
+  };
+
+  const handleFollowUpClick = (lead: Lead) => {
+    setLeadForFollowUp(lead);
+    setIsFollowUpModalOpen(true);
+  };
+
+  const handleFollowUpSubmit = async (date: string | null, note: string | null) => {
+    if (leadForFollowUp) {
+      await updateLeadFollowUp(leadForFollowUp.id, date, note);
+      setIsFollowUpModalOpen(false);
+      setLeadForFollowUp(null);
     }
   };
 
@@ -1351,6 +1466,12 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                             >
                               <MessageCircle className="w-3.5 h-3.5" /> Falar no WhatsApp
                             </a>
+                            <button
+                              onClick={() => handleFollowUpClick(lead)}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-full text-[10px] font-black shadow-lg flex items-center gap-2 transition-transform hover:scale-110 active:scale-95 whitespace-nowrap"
+                            >
+                              <Clock className="w-3.5 h-3.5" /> Follow-up
+                            </button>
                           </div>
 
                           <div className="flex justify-between items-start mb-2">
@@ -1392,6 +1513,22 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                               <Calendar className="w-3 h-3" /> {new Date(lead.createdAt).toLocaleDateString()}
                             </div>
                           </div>
+
+                          {lead.nextFollowUpDate && (
+                            <div className="mb-3 p-2 bg-indigo-50 border border-indigo-100 rounded-lg animate-pulse">
+                              <div className="flex items-center gap-2 text-indigo-700 font-bold text-[10px] mb-1">
+                                <Clock className="w-3 h-3" /> PRÓXIMO CONTATO:
+                              </div>
+                              <p className="text-[11px] font-black text-indigo-900">
+                                {new Date(lead.nextFollowUpDate).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              {lead.nextFollowUpNote && (
+                                <p className="text-[10px] text-indigo-600 mt-1 italic leading-tight line-clamp-2">
+                                  "{lead.nextFollowUpNote}"
+                                </p>
+                              )}
+                            </div>
+                          )}
 
                           {assignedTo && (
                             <div className={`mb-3 flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full border font-semibold w-fit ${isAdmin ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
@@ -1462,6 +1599,12 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
       />
 
       <ImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleImport} team={team} immersiveClasses={immersiveClasses} />
+      <FollowUpModal
+        isOpen={isFollowUpModalOpen}
+        onClose={() => setIsFollowUpModalOpen(false)}
+        onSubmit={handleFollowUpSubmit}
+        lead={leadForFollowUp}
+      />
       <ObservationModal isOpen={isObservationModalOpen} onClose={() => setIsObservationModalOpen(false)} onSubmit={handleObservationSubmit} />
       <ReassignModal
         isOpen={isReassignModalOpen}
