@@ -8,6 +8,7 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   NEGOCIANDO: 'Em negociação',
   SINAL: 'Sinal de Venda',
   GANHO: 'Fechados',
+  NAO_INTERESSADO: 'Não tem interesse',
 };
 
 export const STATUS_COLORS: Record<LeadStatus, string> = {
@@ -18,6 +19,7 @@ export const STATUS_COLORS: Record<LeadStatus, string> = {
   NEGOCIANDO: 'bg-purple-100 text-purple-800 border-purple-200',
   SINAL: 'bg-amber-100 text-amber-800 border-amber-200',
   GANHO: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  NAO_INTERESSADO: 'bg-gray-100 text-gray-800 border-gray-200',
 };
 
 export const MOCK_TEAM = [

@@ -40,10 +40,12 @@ interface AppContextType {
   addKnowledgeItem: (item: Omit<KnowledgeItem, 'id' | 'updatedAt'>) => void;
   removeKnowledgeItem: (id: string) => void;
   syncKnowledgeItem: (id: string) => Promise<void>;
+  uploadFile: (file: File) => Promise<string>;
   addClass: (cls: Omit<ImmersiveClass, 'id'>) => void;
   updateClass: (id: string, cls: Omit<ImmersiveClass, 'id'>) => void;
   removeClass: (id: string) => void;
   settleDownPayment: (leadId: string, amount: number, paymentMethod: string, observation?: string) => Promise<void>;
+  updateLeadFollowUp: (leadId: string, date: string | null, note: string | null) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -85,6 +87,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         const { data: dbClasses } = await supabase.from('immersive_classes').select('*');
         const { data: dbKnowledge } = await supabase.from('knowledge_items').select('*');
         const { data: dbHistory } = await supabase.from('lead_history').select('*');
+
+        // Fetch shared sync config from settings table
+        const { data: dbSettings } = await supabase.from('settings').select('*').eq('id', 'sync_config').single();
 
         if (dbLeads) setLeads(dbLeads);
         else {
@@ -139,8 +144,12 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         const savedSuppliersUrl = localStorage.getItem('suppliersSyncUrl');
         if (savedSuppliersUrl) setSuppliersSyncUrl(savedSuppliersUrl);
 
-        const savedSync = localStorage.getItem('lastSyncConfig');
-        if (savedSync) setLastSyncConfig(JSON.parse(savedSync));
+        if (dbSettings && dbSettings.value) {
+          setLastSyncConfig(dbSettings.value);
+        } else {
+          const savedSync = localStorage.getItem('lastSyncConfig');
+          if (savedSync) setLastSyncConfig(JSON.parse(savedSync));
+        }
 
       } catch (error) {
         console.error("Erro ao sincronizar com Supabase:", error);
@@ -519,11 +528,13 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     await supabase.from('leads').insert(newLeads);
 
     if (sheetsUrl && assignmentConfig) {
-      setLastSyncConfig({
+      const config: SyncConfig = {
         url: sheetsUrl,
         sellerId: assignmentConfig.sellerId,
         assignmentType: assignmentConfig.type
-      });
+      };
+      setLastSyncConfig(config);
+      await supabase.from('settings').upsert({ id: 'sync_config', value: config });
     }
 
     if (totalImportCost > 0) {
@@ -709,6 +720,45 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     }
   };
 
+  const updateLeadFollowUp = async (leadId: string, date: string | null, note: string | null) => {
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, nextFollowUpDate: date || undefined, nextFollowUpNote: note || undefined } : l));
+    await supabase.from('leads').update({
+      nextFollowUpDate: date,
+      nextFollowUpNote: note,
+      updatedAt: new Date().toISOString()
+    }).eq('id', leadId);
+
+    if (date) {
+      showToast("Follow-up agendado com sucesso!", "success");
+    } else {
+      showToast("Agendamento removido.", "info");
+    }
+  };
+
+  const uploadFile = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${crypto.randomUUID()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { data, error } = await supabase.storage
+      .from('knowledge-assets')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('Supabase Storage Error:', error.message, error);
+      if (error.message.includes('bucket not found')) {
+        throw new Error('Bucket "knowledge-assets" não encontrado no Supabase. Crie o bucket com acesso público para continuar.');
+      }
+      throw error;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('knowledge-assets')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -716,7 +766,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         addLead, updateLeadStatus, reassignLeads, importLeads, deleteLeads, clearLeads, addTransaction, payCommission,
         addSupplier, removeSupplier, syncSuppliers,
         addTeamMember, removeTeamMember, getSalesBySeller, addKnowledgeItem, removeKnowledgeItem,
-        syncKnowledgeItem, addClass, updateClass, removeClass, settleDownPayment, showToast
+        syncKnowledgeItem, addClass, updateClass, removeClass, settleDownPayment, showToast, updateLeadFollowUp,
+        uploadFile
       }}
     >
       {children}

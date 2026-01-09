@@ -13,9 +13,20 @@ export const LostLeads = () => {
     const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-    // Filter only lost leads
-    const lostLeads = leads.filter(l => l.status === 'SEM_RESPOSTA').sort((a, b) => {
-        return new Date(b.lostAt || b.createdAt).getTime() - new Date(a.lostAt || a.createdAt).getTime();
+    // Filter only lost leads (SEM_RESPOSTA or NAO_INTERESSADO > 3 days)
+    const lostLeads = leads.filter(l => {
+        if (l.status === 'SEM_RESPOSTA') return true;
+
+        if (l.status === 'NAO_INTERESSADO') {
+            const updatedAt = new Date(l.updatedAt);
+            const diffTime = Math.abs(new Date().getTime() - updatedAt.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays > 3;
+        }
+
+        return false;
+    }).sort((a, b) => {
+        return new Date(b.lostAt || b.updatedAt || b.createdAt).getTime() - new Date(a.lostAt || a.updatedAt || a.createdAt).getTime();
     });
 
     const filteredLeads = lostLeads.filter(lead =>

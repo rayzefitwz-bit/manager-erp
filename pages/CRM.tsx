@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { LeadStatus, Lead, Modality, ImmersiveClass } from '../types';
 import { STATUS_LABELS, STATUS_COLORS } from '../constants';
-import { MessageCircle, FileUp, MoreHorizontal, Plus, Users, Shuffle, UserCheck, Link, Globe, RefreshCw, Calendar, Target, UserPlus, CheckSquare, Square, XCircle, Trash2, DollarSign, CheckCircle } from 'lucide-react';
+import { MessageCircle, FileUp, MoreHorizontal, Plus, Users, Shuffle, UserCheck, Link, Globe, RefreshCw, Calendar, Target, UserPlus, CheckSquare, Square, XCircle, Trash2, DollarSign, CheckCircle, Clock } from 'lucide-react';
 import { read, utils } from 'xlsx';
 import confetti from 'canvas-confetti';
 
@@ -719,7 +719,7 @@ const SettlePaymentModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div className="bg-white p-6 rounded-xl shadow-xl w-[450px] animate-fade-in">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-[450px] animate-fade-in text-gray-800">
         <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-green-600" />
           Receber Pagamento Restante
@@ -767,7 +767,7 @@ const SettlePaymentModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
           </div>
 
           <div className="flex justify-end gap-2 mt-6">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg font-bold">Cancelar</button>
             <button
               type="submit"
               className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-bold shadow-md"
@@ -782,8 +782,222 @@ const SettlePaymentModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
   );
 };
 
+// Modal for scheduling follow-up
+const FollowUpModal = ({ isOpen, onClose, onSubmit, lead }: any) => {
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (isOpen && lead) {
+      if (lead.nextFollowUpDate) {
+        const d = new Date(lead.nextFollowUpDate);
+        setDate(d.toISOString().split('T')[0]);
+        setTime(d.toTimeString().slice(0, 5));
+      } else {
+        setDate('');
+        setTime('');
+      }
+      setNote(lead.nextFollowUpNote || '');
+    }
+  }, [isOpen, lead]);
+
+  const handleSubmit = (e: React.FormEvent, addToCalendar: boolean = false) => {
+    e.preventDefault();
+    if (date && time) {
+      const dateTime = `${date}T${time}:00`;
+      onSubmit(dateTime, note);
+
+      if (addToCalendar) {
+        const start = dateTime.replace(/[-:]/g, '');
+        // Assume 30 min duration for follow-up
+        const endDate = new Date(new Date(dateTime).getTime() + 30 * 60000);
+
+        // Helper to format local date for Google Calendar (YYYYMMDDTHHMMSS)
+        const formatLocalDate = (d: Date) => {
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+        };
+
+        const end = formatLocalDate(endDate);
+
+        const calendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Follow-up: ${lead?.name}`)}&dates=${start}/${end}&details=${encodeURIComponent(note || 'Retornar contato com o lead.')}`;
+        window.open(calendarUrl, '_blank');
+      }
+    } else {
+      onSubmit(null, null);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-[450px] animate-fade-in text-gray-800">
+        <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+          <Clock className="w-5 h-5 text-indigo-600" />
+          Agendar Follow-up
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Defina uma data e hora para retornar o contato com <span className="font-bold">{lead?.name}</span>.
+        </p>
+
+        <form onSubmit={(e) => handleSubmit(e)} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Data</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                className="w-full border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+                required={!!time || !!note}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Hora</label>
+              <input
+                type="time"
+                value={time}
+                onChange={e => setTime(e.target.value)}
+                className="w-full border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+                required={!!date}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">O que precisa ser feito?</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              className="w-full border p-2.5 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none"
+              rows={3}
+              placeholder="Ex: Ligar para confirmar presença às 8h"
+            ></textarea>
+          </div>
+
+          <div className="flex flex-col gap-3 mt-6">
+            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-dashed border-gray-200">
+              <span className="text-xs text-gray-500 font-medium">Sincronizar com sua agenda?</span>
+              <button
+                type="button"
+                onClick={(e) => handleSubmit(e, true)}
+                disabled={!date || !time}
+                className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-gray-50 disabled:opacity-50 transition-all shadow-sm"
+              >
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                Salvar e Abrir no Google Calendar
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <button
+                type="button"
+                onClick={() => { onSubmit(null, null); }}
+                className="text-xs font-bold text-red-500 hover:text-red-700 uppercase"
+              >
+                Remover Agendamento
+              </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg font-bold">Cancelar</button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-md"
+                >
+                  Apenas Salvar Lembrete
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Modal for Not Interested Reason
+const ReasonModal = ({ isOpen, onClose, onSubmit }: any) => {
+  const [reason, setReason] = useState('');
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70]">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-96 animate-fade-in text-gray-800">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-red-600">
+          <Target className="w-5 h-5" />
+          Motivo do Impasse
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Por qual motivo o lead não fechou agora?
+        </p>
+
+        <div className="space-y-2">
+          {['Financeiro', 'Data e Local', 'Cadastrou por engano', 'Lead desqualificado'].map(r => (
+            <button
+              key={r}
+              onClick={() => setReason(r)}
+              className={`w-full text-left px-4 py-3 rounded-lg border transition-all font-bold text-sm ${reason === r
+                ? 'bg-red-50 border-red-500 text-red-700 shadow-sm'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300'
+                }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg font-bold">Cancelar</button>
+          <button
+            onClick={() => onSubmit(reason)}
+            disabled={!reason}
+            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 text-sm font-bold shadow-md"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Modal for Offer Check (Upsell/Downsell check)
+const OfferCheckModal = ({ isOpen, onClose, onSubmit }: any) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[80]">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-96 animate-fade-in text-gray-800">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-indigo-600">
+          <Target className="w-5 h-5" />
+          Verificação de Oferta
+        </h3>
+        <p className="text-base font-medium text-gray-800 mb-6 text-center">
+          Você já ofereceu o online ao vivo e o gravado?
+        </p>
+
+        <div className="flex gap-4 justify-center">
+          <button
+            onClick={() => onSubmit(false)}
+            className="px-6 py-3 bg-white border-2 border-red-500 text-red-600 rounded-xl hover:bg-red-50 font-bold shadow-sm min-w-[100px]"
+          >
+            NÃO
+          </button>
+          <button
+            onClick={() => onSubmit(true)}
+            className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-bold shadow-md min-w-[100px]"
+          >
+            SIM
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const CRM = () => {
-  const { leads, team, isLoading, updateLeadStatus, addLead, reassignLeads, importLeads, deleteLeads, clearLeads, lastSyncConfig, settleDownPayment, immersiveClasses } = useApp();
+  const { leads, team, isLoading, updateLeadStatus, addLead, reassignLeads, importLeads, deleteLeads, clearLeads, lastSyncConfig, settleDownPayment, immersiveClasses, showToast, updateLeadFollowUp } = useApp();
   const { user } = useAuth();
 
   // States
@@ -800,6 +1014,14 @@ export const CRM = () => {
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
+  const [leadForFollowUp, setLeadForFollowUp] = useState<Lead | null>(null);
+
+  // Not Interested Logic States
+  const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
+  const [isOfferCheckModalOpen, setIsOfferCheckModalOpen] = useState(false);
+  const [tempReason, setTempReason] = useState('');
+  const [leadToNotInterested, setLeadToNotInterested] = useState<string | null>(null);
 
   // Board Drag to Scroll States
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -846,7 +1068,7 @@ export const CRM = () => {
 
   const isAdmin = user?.role === 'ADMIN';
 
-  const statuses: LeadStatus[] = ['NOVO', 'LIGACAO', 'WHATSAPP', 'SEM_RESPOSTA', 'NEGOCIANDO', 'SINAL', 'GANHO'];
+  const statuses: LeadStatus[] = ['NOVO', 'LIGACAO', 'WHATSAPP', 'SEM_RESPOSTA', 'NEGOCIANDO', 'SINAL', 'GANHO', 'NAO_INTERESSADO'];
 
   // Filter leads logic
   const filteredLeads = leads.filter(lead => {
@@ -855,12 +1077,20 @@ export const CRM = () => {
       return false;
     }
 
-    // 7-day rule for lost leads
+    // 7-day rule for lost leads (SEM_RESPOSTA)
     if (lead.status === 'SEM_RESPOSTA' && lead.lostAt) {
       const lostDate = new Date(lead.lostAt);
       const diffTime = Math.abs(new Date().getTime() - lostDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays > 7) return false;
+    }
+
+    // 3-day rule for "Não tem interesse" leads for VENDEDOR
+    if (lead.status === 'NAO_INTERESSADO' && !isAdmin) {
+      const updatedAt = new Date(lead.updatedAt);
+      const diffTime = Math.abs(new Date().getTime() - updatedAt.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 3) return false;
     }
 
     // Search filter
@@ -902,7 +1132,8 @@ export const CRM = () => {
       'SEM_RESPOSTA': 0,
       'NEGOCIANDO': 0,
       'SINAL': 0,
-      'GANHO': 0
+      'GANHO': 0,
+      'NAO_INTERESSADO': 0
     };
 
     userLeads.forEach(lead => {
@@ -960,10 +1191,29 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
     const lead = leads.find(l => l.id === leadId);
     if (!lead) return;
 
+    // Restriction for Sellers: Cannot move back from advanced stages
+    if (!isAdmin) {
+      const STATUS_ORDER: LeadStatus[] = ['NOVO', 'LIGACAO', 'WHATSAPP', 'SEM_RESPOSTA', 'NEGOCIANDO', 'SINAL', 'GANHO', 'NAO_INTERESSADO'];
+      const RESTRICTED_STAGES: LeadStatus[] = ['NEGOCIANDO', 'SINAL', 'GANHO', 'NAO_INTERESSADO'];
+
+      const currentIndex = STATUS_ORDER.indexOf(lead.status);
+      const newIndex = STATUS_ORDER.indexOf(newStatus as LeadStatus);
+
+      // If current status is restricted AND we are trying to move backward
+      if (RESTRICTED_STAGES.includes(lead.status) && newIndex < currentIndex) {
+        showToast("Apenas administradores podem retornar leads desta etapa.", "error");
+        return;
+      }
+    }
+
     if (lead.status === 'NOVO' && newStatus !== 'NOVO') {
       setPendingLeadId(leadId);
       setPendingStatus(newStatus as LeadStatus);
       setIsObservationModalOpen(true);
+    } else if (newStatus === 'NAO_INTERESSADO') {
+      // Intercept move to Not Interested
+      setLeadToNotInterested(leadId);
+      setIsReasonModalOpen(true);
     } else {
       finalizeStatusChange(leadId, newStatus as LeadStatus);
     }
@@ -1025,6 +1275,19 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
     }
   };
 
+  const handleFollowUpClick = (lead: Lead) => {
+    setLeadForFollowUp(lead);
+    setIsFollowUpModalOpen(true);
+  };
+
+  const handleFollowUpSubmit = async (date: string | null, note: string | null) => {
+    if (leadForFollowUp) {
+      await updateLeadFollowUp(leadForFollowUp.id, date, note);
+      setIsFollowUpModalOpen(false);
+      setLeadForFollowUp(null);
+    }
+  };
+
   const handleSettleClick = (lead: Lead) => {
     setLeadToSettle(lead);
     setIsSettleModalOpen(true);
@@ -1069,8 +1332,10 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
   const handleSyncClick = () => {
     if (lastSyncConfig) {
       handleSync(lastSyncConfig.url, { type: lastSyncConfig.assignmentType || 'SINGLE', sellerId: lastSyncConfig.sellerId });
-    } else {
+    } else if (isAdmin) {
       setIsSyncConfigModalOpen(true);
+    } else {
+      showToast("Sincronização não configurada pelo administrador.", "info");
     }
   };
 
@@ -1102,6 +1367,7 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
         .filter(item => item !== null && item.name !== '' && item.phone !== '') as Array<{ name: string; phone: string; role?: string; classLocation?: string; createdAt?: string }>;
 
       importLeads(parsed, 0, assignmentConfig, url);
+      showToast("Sincronização concluída!", "success");
     } catch (error) {
       alert("Erro na sincronização. Verifique o link e tente novamente.");
     } finally {
@@ -1150,8 +1416,49 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
     }
   };
 
+  const handleReasonSubmit = (reason: string) => {
+    setTempReason(reason);
+    setIsReasonModalOpen(false);
+
+    if (reason === 'Financeiro' || reason === 'Data e Local') {
+      setIsOfferCheckModalOpen(true);
+    } else {
+      // Direct move for other reasons
+      if (leadToNotInterested) {
+        finalizeStatusChange(leadToNotInterested, 'NAO_INTERESSADO', `Motivo: ${reason}`);
+        setLeadToNotInterested(null);
+        setTempReason('');
+      }
+    }
+  };
+
+  const handleOfferCheckSubmit = (hasOffered: boolean) => {
+    setIsOfferCheckModalOpen(false);
+
+    if (hasOffered) {
+      if (leadToNotInterested) {
+        finalizeStatusChange(leadToNotInterested, 'NAO_INTERESSADO', `Motivo: ${tempReason} (Oferta alternativa feita)`);
+      }
+    } else {
+      showToast("Volte a base de conhecimento e ofereça o online ao vivo", "info");
+      // Cancel move (effectively do nothing as we haven't changed status yet)
+    }
+    setLeadToNotInterested(null);
+    setTempReason('');
+  };
+
   return (
     <div className="h-full flex flex-col relative">
+      <ReasonModal
+        isOpen={isReasonModalOpen}
+        onClose={() => { setIsReasonModalOpen(false); setLeadToNotInterested(null); }}
+        onSubmit={handleReasonSubmit}
+      />
+      <OfferCheckModal
+        isOpen={isOfferCheckModalOpen}
+        onClose={() => { setIsOfferCheckModalOpen(false); setLeadToNotInterested(null); }}
+        onSubmit={handleOfferCheckSubmit}
+      />
       <SyncConfigModal
         isOpen={isSyncConfigModalOpen}
         onClose={() => setIsSyncConfigModalOpen(false)}
@@ -1234,10 +1541,10 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
           <button
             onClick={handleSyncClick}
             disabled={isSyncing}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-all text-sm font-bold ${lastSyncConfig ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'}`}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition-all text-sm font-bold"
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Sincronizando...' : (lastSyncConfig ? 'Sincronizar' : 'Configurar Sync')}
+            {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
           </button>
           <button onClick={() => setShowNewLeadForm(!showNewLeadForm)} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm transition-all text-sm font-bold">
             <Plus className="w-4 h-4" /> Novo Lead
@@ -1339,6 +1646,12 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                             >
                               <MessageCircle className="w-3.5 h-3.5" /> Falar no WhatsApp
                             </a>
+                            <button
+                              onClick={() => handleFollowUpClick(lead)}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-full text-[10px] font-black shadow-lg flex items-center gap-2 transition-transform hover:scale-110 active:scale-95 whitespace-nowrap"
+                            >
+                              <Clock className="w-3.5 h-3.5" /> Follow-up
+                            </button>
                           </div>
 
                           <div className="flex justify-between items-start mb-2">
@@ -1380,6 +1693,22 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
                               <Calendar className="w-3 h-3" /> {new Date(lead.createdAt).toLocaleDateString()}
                             </div>
                           </div>
+
+                          {lead.nextFollowUpDate && (
+                            <div className="mb-3 p-2 bg-indigo-50 border border-indigo-100 rounded-lg animate-pulse">
+                              <div className="flex items-center gap-2 text-indigo-700 font-bold text-[10px] mb-1">
+                                <Clock className="w-3 h-3" /> PRÓXIMO CONTATO:
+                              </div>
+                              <p className="text-[11px] font-black text-indigo-900">
+                                {new Date(lead.nextFollowUpDate).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              {lead.nextFollowUpNote && (
+                                <p className="text-[10px] text-indigo-600 mt-1 italic leading-tight line-clamp-2">
+                                  "{lead.nextFollowUpNote}"
+                                </p>
+                              )}
+                            </div>
+                          )}
 
                           {assignedTo && (
                             <div className={`mb-3 flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full border font-semibold w-fit ${isAdmin ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
@@ -1450,6 +1779,12 @@ Me chamo *${sellerName}* da imersão de Google Ads + IA.`;
       />
 
       <ImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleImport} team={team} immersiveClasses={immersiveClasses} />
+      <FollowUpModal
+        isOpen={isFollowUpModalOpen}
+        onClose={() => setIsFollowUpModalOpen(false)}
+        onSubmit={handleFollowUpSubmit}
+        lead={leadForFollowUp}
+      />
       <ObservationModal isOpen={isObservationModalOpen} onClose={() => setIsObservationModalOpen(false)} onSubmit={handleObservationSubmit} />
       <ReassignModal
         isOpen={isReassignModalOpen}

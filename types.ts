@@ -1,7 +1,7 @@
 
 export type UserRole = 'ADMIN' | 'VENDEDOR' | 'PROFESSOR';
 
-export type LeadStatus = 'NOVO' | 'LIGACAO' | 'WHATSAPP' | 'SEM_RESPOSTA' | 'NEGOCIANDO' | 'SINAL' | 'GANHO';
+export type LeadStatus = 'NOVO' | 'LIGACAO' | 'WHATSAPP' | 'SEM_RESPOSTA' | 'NEGOCIANDO' | 'SINAL' | 'GANHO' | 'NAO_INTERESSADO';
 
 export type Modality = 'ONLINE' | 'PRESENCIAL' | null;
 
@@ -26,6 +26,8 @@ export interface Lead {
   downPaymentValue?: number; // Valor do sinal pago
   remainingBalance?: number; // Saldo restante a ser pago
   wonAt?: string; // Data em que a venda foi fechada ou sinal quitado
+  nextFollowUpDate?: string;
+  nextFollowUpNote?: string;
 }
 
 export interface LeadHistoryEntry {
@@ -95,6 +97,7 @@ export interface KnowledgeItem {
   category?: string;
   link?: string;
   syncUrl?: string; // Novo: URL de sincronização direta (Docs/Sheets)
+  attachments?: { name: string; url: string; type: 'image' | 'video' }[];
   updatedAt: string;
 }
 
